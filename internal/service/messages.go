@@ -64,7 +64,7 @@ func (s *Scheduler) deployNamespace(ctx context.Context, m *queue.M) error {
 		}
 
 		payload["environment"] = nsDeploymentPlan.EnvironmentName
-		payload["namespace"] = nsDeploymentPlan.Namespace.Name
+		payload["namespace"] = nsDeploymentPlan.Namespace.Alias
 		payload["cluster"] = nsDeploymentPlan.Namespace.ClusterName
 		payload["artifact_name"] = x.ArtifactName
 		payload["artifact_version"] = x.AvailableVersion
