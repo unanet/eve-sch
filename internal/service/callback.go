@@ -45,7 +45,7 @@ func (c *FnCall) Post(ctx context.Context, url string, body interface{}) (*FnRes
 	if err != nil {
 		return nil, errors.Wrap(err)
 	}
-	resp, err := c.sling.Do(r.WithContext(ctx), &FnResponse{}, &failure)
+	resp, err := c.sling.Do(r.WithContext(ctx), &success, &failure)
 	if err != nil {
 		return nil, errors.Wrap(err)
 	}
