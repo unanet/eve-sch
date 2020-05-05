@@ -59,4 +59,5 @@ dist: build
 
 deploy:
 	kubectl apply -f .kube/manifest.yaml
+	docker pull ${IMAGE_NAME}:${PATCH_VERSION}
 	kubectl set image -n eve-sch deployment/eve-sch-v1 eve-sch-v1=${IMAGE_DIGEST} --record
