@@ -18,7 +18,7 @@ const (
 )
 
 type FnResponse struct {
-	Status   string   `json:"status"`
+	Result   string   `json:"result"`
 	Messages []string `json:"messages"`
 }
 
