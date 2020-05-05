@@ -76,16 +76,16 @@ func TokenAuthenticatorK8s(c *Client) error {
 		return errors.Wrapf("invalid vault response: %v", respMap)
 	}
 
-	if auth, ok := respMap["auth"].(map[string]interface{}); ok {
-		if accessor, ok := auth["accessor"].(map[string]interface{}); ok {
-			if token, ok := accessor["client_token"].(string); ok {
-				c.SetToken(token)
-				return nil
-			}
-		}
+	auth, ok := respMap["auth"].(map[string]interface{})
+	if !ok {
+		return errors.Wrapf("invalid vault response [auth]: %vs", respMap)
 	}
-
-	return errors.Wrapf("invalid vault response: %vs", respMap)
+	token, ok := auth["client_token"].(string)
+	if !ok {
+		return errors.Wrapf("invalid vault response [client_token]: %vs", auth)
+	}
+	c.SetToken(token)
+	return nil
 }
 
 type Config struct {
