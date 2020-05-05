@@ -22,11 +22,10 @@ import (
 
 func main() {
 	config := config2.GetConfig()
-
+	time.Sleep(1 * time.Hour)
 	awsSession, err := session.NewSession(&aws.Config{
 		Region: aws.String(config.AWSRegion),
-	},
-	)
+	})
 	if err != nil {
 		log.Logger.Panic("Failed to create AWS Session", zap.Error(err))
 	}

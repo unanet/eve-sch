@@ -59,4 +59,4 @@ dist: build
 
 deploy:
 	kubectl apply -f .kube/manifest.yaml
-	kubectl set image deployment/eve-sch-v1 eve-sch-v1=${IMAGE_DIGEST} --record
+	kubectl set image -n eve-sch deployment/eve-sch-v1 eve-sch-v1=${IMAGE_DIGEST} --record
