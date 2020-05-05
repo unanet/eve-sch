@@ -53,6 +53,7 @@ func TokenAuthenticatorK8s(c *Client) error {
 	if err != nil {
 		return errors.Wrap(err)
 	}
+
 	var jsonStr = []byte(fmt.Sprintf(`{"jwt":"%s", "role": "%s"}`, data, c.vaultRole))
 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/v1/auth/kubernetes/login", c.vaultAddr), bytes.NewBuffer(jsonStr))
 	if err != nil {
@@ -76,9 +77,11 @@ func TokenAuthenticatorK8s(c *Client) error {
 	}
 
 	if auth, ok := respMap["auth"].(map[string]interface{}); ok {
-		if token, ok := auth["client_token"].(string); ok {
-			c.SetToken(token)
-			return nil
+		if accessor, ok := auth["accessor"].(map[string]interface{}); ok {
+			if token, ok := accessor["client_token"].(string); ok {
+				c.SetToken(token)
+				return nil
+			}
 		}
 	}
 
