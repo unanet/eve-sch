@@ -76,7 +76,7 @@ func TokenAuthenticatorK8s(c *Client) error {
 	}
 
 	if auth, ok := respMap["auth"].(map[string]interface{}); ok {
-		if token, ok := auth["token"].(string); ok {
+		if token, ok := auth["client_token"].(string); ok {
 			c.SetToken(token)
 			return nil
 		}
