@@ -2,7 +2,7 @@ module gitlab.unanet.io/devops/eve-sch
 
 go 1.14
 
-replace gitlab.unanet.io/devops/eve => /Users/centzi/code/devops/eve
+// replace gitlab.unanet.io/devops/eve => /Users/centzi/code/devops/eve
 
 require (
 	github.com/aws/aws-sdk-go v1.25.41
