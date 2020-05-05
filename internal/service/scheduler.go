@@ -42,6 +42,10 @@ type SecretsClient interface {
 	GetKVSecretMap(path string) (map[string]string, error)
 }
 
+type FunctionTrigger interface {
+	Post(ctx context.Context, url string, body interface{}) (*FnResponse, error)
+}
+
 type Scheduler struct {
 	worker     QueueWorker
 	downloader CloudDownloader
@@ -51,9 +55,10 @@ type Scheduler struct {
 	done       chan bool
 	apiQUrl    string
 	vault      SecretsClient
+	fnTrigger  FunctionTrigger
 }
 
-func NewScheduler(worker QueueWorker, downloader CloudDownloader, uploader CloudUploader, apiQUrl string, vault SecretsClient) *Scheduler {
+func NewScheduler(worker QueueWorker, downloader CloudDownloader, uploader CloudUploader, apiQUrl string, vault SecretsClient, fnTrigger FunctionTrigger) *Scheduler {
 	return &Scheduler{
 		worker:     worker,
 		downloader: downloader,
@@ -62,6 +67,7 @@ func NewScheduler(worker QueueWorker, downloader CloudDownloader, uploader Cloud
 		sigChannel: make(chan os.Signal, 1024),
 		apiQUrl:    apiQUrl,
 		vault:      vault,
+		fnTrigger:  fnTrigger,
 	}
 }
 

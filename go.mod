@@ -11,7 +11,7 @@ require (
 	github.com/hashicorp/vault/api v1.0.5-0.20200317185738-82f498082f02
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/stretchr/testify v1.4.0
-	gitlab.unanet.io/devops/eve v0.0.0-20200505053349-d9f19a12d1bc
+	gitlab.unanet.io/devops/eve v0.0.0-20200505213722-835a24ebb79a
 	go.uber.org/zap v1.15.0
 	golang.org/x/crypto v0.0.0-20200429183012-4b2356b1ed79 // indirect
 	golang.org/x/net v0.0.0-20200501053045-e0ff5e5a1de5 // indirect

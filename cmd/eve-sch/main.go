@@ -48,8 +48,10 @@ func main() {
 
 	s3Downloader := s3.NewDownloader(awsSession)
 
+	fnTrigger := service.NewFnTrigger(1 * time.Hour)
+
 	worker := queue.NewWorker("eve-sch", schQueue, config.SchQWorkerTimeout)
-	service.NewScheduler(worker, s3Downloader, s3Uploader, config.ApiQUrl, vault).Start()
+	service.NewScheduler(worker, s3Downloader, s3Uploader, config.ApiQUrl, vault, fnTrigger).Start()
 }
 
 func kube() {

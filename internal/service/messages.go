@@ -44,17 +44,45 @@ func (s *Scheduler) deployNamespace(ctx context.Context, m *queue.M) error {
 		return errors.Wrap(err)
 	}
 
+	vaultSecrets, err := s.vault.GetKVSecretMap(nsDeploymentPlan.Namespace.ClusterName)
+	if err != nil {
+		return errors.Wrap(err)
+	}
+
+	for _, x := range nsDeploymentPlan.Services {
+		if len(x.ArtifactFnPtr) == 0 {
+			continue
+		}
+
+		payload := make(map[string]interface{})
+		for k, v := range x.Metadata {
+			payload[k] = v
+		}
+
+		for k, v := range vaultSecrets {
+			payload[k] = v
+		}
+
+		payload["environment"] = nsDeploymentPlan.EnvironmentName
+		payload["namespace"] = nsDeploymentPlan.Namespace.Name
+		payload["cluster"] = nsDeploymentPlan.Namespace.ClusterName
+		payload["artifact_name"] = x.ArtifactName
+		payload["artifact_version"] = x.AvailableVersion
+		payload["artifact_repo"] = x.ArtifactoryFeed
+		payload["artifact_path"] = x.ArtifactoryPath
+
+		resp, err := s.fnTrigger.Post(ctx, x.ArtifactFnPtr, payload)
+		if err != nil {
+			return errors.Wrap(err)
+		}
+
+		s.Logger(ctx).Info("response from function call", zap.String("resp", fmt.Sprintf("%v", resp)))
+	}
+
 	err = s.worker.DeleteMessage(ctx, m)
 	if err != nil {
 		return errors.Wrap(err)
 	}
-
-	sMap, err := s.vault.GetKVSecretMap("eve-sch")
-	if err != nil {
-		return errors.Wrap(err)
-	}
-
-	s.Logger(ctx).Info("here's the map", zap.String("map", fmt.Sprintf("%v", sMap)))
 
 	uLocation, err := s.uploader.Upload(ctx, fmt.Sprintf("%s-result", m.ID), planText)
 	if err != nil {
