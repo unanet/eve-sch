@@ -17,6 +17,7 @@ import (
 	"k8s.io/client-go/rest"
 
 	config2 "gitlab.unanet.io/devops/eve-sch/internal/config"
+	"gitlab.unanet.io/devops/eve-sch/internal/secrets"
 	"gitlab.unanet.io/devops/eve-sch/internal/service"
 )
 
@@ -26,7 +27,12 @@ func main() {
 		Region: aws.String(config.AWSRegion),
 	})
 	if err != nil {
-		log.Logger.Panic("Failed to create AWS Session", zap.Error(err))
+		log.Logger.Panic("failed to create aws session", zap.Error(err))
+	}
+
+	vault, err := secrets.NewClient(config.VaultConfig)
+	if err != nil {
+		log.Logger.Panic("failed to create the vault secrets client")
 	}
 
 	schQueue := queue.NewQ(awsSession, queue.Config{
@@ -43,7 +49,7 @@ func main() {
 	s3Downloader := s3.NewDownloader(awsSession)
 
 	worker := queue.NewWorker("eve-sch", schQueue, config.SchQWorkerTimeout)
-	service.NewScheduler(worker, s3Downloader, s3Uploader, config.ApiQUrl).Start()
+	service.NewScheduler(worker, s3Downloader, s3Uploader, config.ApiQUrl, vault).Start()
 }
 
 func kube() {

@@ -6,6 +6,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"gitlab.unanet.io/devops/eve-sch/internal/config"
+	"gitlab.unanet.io/devops/eve-sch/internal/secrets"
 )
 
 var (
@@ -17,7 +20,7 @@ func client(t *testing.T) *secrets.Client {
 		return c
 	}
 
-	cl, err := secrets.NewClient(api.GetConfig().VaultConfig)
+	cl, err := secrets.NewClient(config.GetConfig().VaultConfig, secrets.TokenAuthenticatorExistingToken)
 	require.NoError(t, err)
 	c = cl
 	require.NotNil(t, c)
@@ -25,7 +28,7 @@ func client(t *testing.T) *secrets.Client {
 }
 
 func TestClient_GetKVSecret(t *testing.T) {
-	resp, err := client(t).GetKVSecret("devops/artifactory", "ci_readonly_username")
+	resp, err := client(t).GetKVSecretString("devops/artifactory", "ci_readonly_username")
 	require.NoError(t, err)
 	require.Equal(t, "unanet-ci-r", resp)
 }

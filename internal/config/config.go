@@ -8,14 +8,19 @@ import (
 	"go.uber.org/zap"
 
 	"gitlab.unanet.io/devops/eve/pkg/log"
+
+	"gitlab.unanet.io/devops/eve-sch/internal/secrets"
 )
 
 var (
-	config   *Config
-	mutex    = sync.Mutex{}
+	config *Config
+	mutex  = sync.Mutex{}
 )
 
+type VaultConfig = secrets.Config
+
 type Config struct {
+	VaultConfig
 	ApiQUrl                string        `split_words:"true" required:"true"`
 	SchQUrl                string        `split_words:"true" required:"true"`
 	SchQWaitTimeSecond     int64         `split_words:"true" default:"20"`
@@ -24,7 +29,7 @@ type Config struct {
 	SchQWorkerTimeout      time.Duration `split_words:"true" default:"60s"`
 	S3Bucket               string        `split_words:"true" required:"true"`
 	AWSRegion              string        `split_words:"true" required:"true"`
-	MetricsPort 		   int           `split_words:"true" default:"3001"`
+	MetricsPort            int           `split_words:"true" default:"3001"`
 }
 
 func GetConfig() Config {

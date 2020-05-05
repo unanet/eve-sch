@@ -8,7 +8,6 @@ import (
 	"syscall"
 	"time"
 
-
 	"gitlab.unanet.io/devops/eve/pkg/log"
 	"gitlab.unanet.io/devops/eve/pkg/metrics"
 	"gitlab.unanet.io/devops/eve/pkg/queue"
@@ -38,6 +37,11 @@ type CloudUploader interface {
 	Upload(ctx context.Context, key string, body []byte) (*s3.Location, error)
 }
 
+type SecretsClient interface {
+	GetKVSecretString(path string, key string) (string, error)
+	GetKVSecretMap(path string) (map[string]string, error)
+}
+
 type Scheduler struct {
 	worker     QueueWorker
 	downloader CloudDownloader
@@ -46,16 +50,18 @@ type Scheduler struct {
 	mServer    *http.Server
 	done       chan bool
 	apiQUrl    string
+	vault      SecretsClient
 }
 
-func NewScheduler(worker QueueWorker, downloader CloudDownloader, uploader CloudUploader, apiQUrl string) *Scheduler {
+func NewScheduler(worker QueueWorker, downloader CloudDownloader, uploader CloudUploader, apiQUrl string, vault SecretsClient) *Scheduler {
 	return &Scheduler{
-		worker: worker,
+		worker:     worker,
 		downloader: downloader,
-		uploader: uploader,
+		uploader:   uploader,
 		done:       make(chan bool),
 		sigChannel: make(chan os.Signal, 1024),
-		apiQUrl: apiQUrl,
+		apiQUrl:    apiQUrl,
+		vault:      vault,
 	}
 }
 
@@ -103,4 +109,3 @@ func (s *Scheduler) gracefulShutdown() {
 	s.worker.Stop()
 	close(s.done)
 }
-
