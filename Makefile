@@ -58,4 +58,5 @@ dist: build
 		https://unanet.jfrog.io/unanet/api/storage/docker-local/eve-sch/${PATCH_VERSION}\?properties=version=${VERSION}%7Cgitlab-build-properties.project-id=${CI_PROJECT_ID}%7Cgitlab-build-properties.git-sha=${CI_COMMIT_SHORT_SHA}%7Cgitlab-build-properties.git-branch=${CI_COMMIT_BRANCH}
 
 deploy:
+	kubectl apply -f .kube/manifest.yaml
 	kubectl set image deployment/eve-sch-v1 eve-sch-v1=${IMAGE_DIGEST} --record
