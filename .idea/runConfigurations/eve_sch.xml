@@ -10,9 +10,10 @@
       <env name="EVE_SCH_Q_URL" value="https://sqs.us-east-2.amazonaws.com/580107804399/cvs-nonprod-zxrjdqr67u.fifo" />
       <env name="EVE_S3_BUCKET" value="unanet-eve-queue" />
       <env name="EVE_AWS_REGION" value="us-east-2" />
+      <env name="EVE_METRICS_PORT" value="3002" />
     </envs>
     <kind value="FILE" />
-    <filePath value="$PROJECT_DIR$/cmd/main.go" />
+    <filePath value="$PROJECT_DIR$/cmd/eve-sch/main.go" />
     <package value="gitlab.unanet.io/devops/eve-sch" />
     <directory value="$PROJECT_DIR$/" />
     <method v="2" />

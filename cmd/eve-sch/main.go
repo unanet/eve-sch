@@ -16,14 +16,16 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
+	config2 "gitlab.unanet.io/devops/eve-sch/internal/config"
 	"gitlab.unanet.io/devops/eve-sch/internal/service"
 )
 
 func main() {
-	config := service.GetConfig()
+	config := config2.GetConfig()
 
 	awsSession, err := session.NewSession(&aws.Config{
-		Region: aws.String(config.AWSRegion)},
+		Region: aws.String(config.AWSRegion),
+	},
 	)
 	if err != nil {
 		log.Logger.Panic("Failed to create AWS Session", zap.Error(err))
@@ -43,7 +45,7 @@ func main() {
 	s3Downloader := s3.NewDownloader(awsSession)
 
 	worker := queue.NewWorker("eve-sch", schQueue, config.SchQWorkerTimeout)
-	service.NewScheduler(worker, s3Downloader, s3Uploader).Start()
+	service.NewScheduler(worker, s3Downloader, s3Uploader, config.ApiQUrl).Start()
 }
 
 func kube() {

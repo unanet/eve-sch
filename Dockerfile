@@ -8,4 +8,4 @@ WORKDIR /app
 CMD ["/app/eve-sch"]
 
 HEALTHCHECK --interval=1m --timeout=2s --start-period=60s \
-    CMD curl -f http://localhost:${EVE_METRICS_PORT}/ || exit 1
+    CMD curl -f ht  tp://localhost:${EVE_METRICS_PORT}/ || exit 1

@@ -14,6 +14,8 @@ import (
 	"gitlab.unanet.io/devops/eve/pkg/queue"
 	"gitlab.unanet.io/devops/eve/pkg/s3"
 	"go.uber.org/zap"
+
+	"gitlab.unanet.io/devops/eve-sch/internal/config"
 )
 
 const (
@@ -33,7 +35,7 @@ type CloudDownloader interface {
 }
 
 type CloudUploader interface {
-	UploadText(ctx context.Context, key string, body string) (*s3.Location, error)
+	Upload(ctx context.Context, key string, body []byte) (*s3.Location, error)
 }
 
 type Scheduler struct {
@@ -41,17 +43,19 @@ type Scheduler struct {
 	downloader CloudDownloader
 	uploader   CloudUploader
 	sigChannel chan os.Signal
-	mServer     *http.Server
-	done        chan bool
+	mServer    *http.Server
+	done       chan bool
+	apiQUrl    string
 }
 
-func NewScheduler(worker QueueWorker, downloader CloudDownloader, uploader CloudUploader) *Scheduler {
+func NewScheduler(worker QueueWorker, downloader CloudDownloader, uploader CloudUploader, apiQUrl string) *Scheduler {
 	return &Scheduler{
 		worker: worker,
 		downloader: downloader,
 		uploader: uploader,
 		done:       make(chan bool),
 		sigChannel: make(chan os.Signal, 1024),
+		apiQUrl: apiQUrl,
 	}
 }
 
@@ -60,7 +64,7 @@ func (s *Scheduler) Logger(ctx context.Context) *zap.Logger {
 }
 
 func (s *Scheduler) Start() {
-	s.mServer = metrics.StartMetricsServer(GetConfig().MetricsPort)
+	s.mServer = metrics.StartMetricsServer(config.GetConfig().MetricsPort)
 
 	signal.Notify(s.sigChannel, os.Interrupt, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
 	go s.sigHandler()
