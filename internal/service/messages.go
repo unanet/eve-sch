@@ -38,7 +38,7 @@ func (s *Scheduler) deployNamespace(ctx context.Context, m *queue.M) error {
 			s.deployDockerService(ctx, secrets, x, plan)
 		}
 		if len(x.ArtifactFnPtr) > 0 {
-			s.triggerFunction(ctx, secrets, x, plan)
+			s.triggerFunction(ctx, secrets, x.DeployArtifact, plan)
 		}
 	}
 
@@ -47,7 +47,7 @@ func (s *Scheduler) deployNamespace(ctx context.Context, m *queue.M) error {
 			s.runDockerMigrationJob(ctx, secrets, x, plan)
 		}
 		if len(x.ArtifactFnPtr) > 0 {
-			s.triggerFunction(ctx, secrets, x, plan)
+			s.triggerFunction(ctx, secrets, x.DeployArtifact, plan)
 		}
 	}
 

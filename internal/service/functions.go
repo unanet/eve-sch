@@ -24,7 +24,7 @@ func (s *Scheduler) getFunctionCode(ctx context.Context, function string) string
 	return "empty"
 }
 
-func (s *Scheduler) triggerFunction(ctx context.Context, secrets vault.Secrets, service *eve.DeployService, plan *eve.NSDeploymentPlan) {
+func (s *Scheduler) triggerFunction(ctx context.Context, secrets vault.Secrets, service *eve.DeployArtifact, plan *eve.NSDeploymentPlan) {
 	payload := make(map[string]interface{})
 	for k, v := range service.Metadata {
 		payload[k] = v
