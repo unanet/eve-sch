@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 
 	"gitlab.unanet.io/devops/eve/pkg/errors"
 	"gitlab.unanet.io/devops/eve/pkg/eve"
@@ -75,7 +74,6 @@ func (s *Scheduler) triggerFunction(ctx context.Context, secrets vault.Secrets, 
 		plan.Messages = append(plan.Messages, x)
 	}
 
-	s.Logger(ctx).Info(fmt.Sprintf("############################# %s ##########################", resp.Result))
 	service.Result = eve.ParseDeployArtifactResult(resp.Result)
 }
 
