@@ -68,6 +68,9 @@ func (s *Scheduler) triggerFunction(ctx context.Context, secrets vault.Secrets, 
 	}
 
 	for _, x := range resp.Messages {
+		if len(x) == 0 {
+			continue
+		}
 		plan.Messages = append(plan.Messages, x)
 	}
 
