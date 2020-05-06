@@ -687,6 +687,8 @@ gitlab.unanet.io/devops/eve v0.0.0-20200505053349-d9f19a12d1bc h1:vUisdKiuUcQnsE
 gitlab.unanet.io/devops/eve v0.0.0-20200505053349-d9f19a12d1bc/go.mod h1:aWx4BKjquGRj540732Mb8iCEJzi3v1aMVZ+LRy/9WpA=
 gitlab.unanet.io/devops/eve v0.0.0-20200505213722-835a24ebb79a h1:KXdfvAc8blEVCTXo23teFaSQirwUw44mVbtky7c3ilo=
 gitlab.unanet.io/devops/eve v0.0.0-20200505213722-835a24ebb79a/go.mod h1:aWx4BKjquGRj540732Mb8iCEJzi3v1aMVZ+LRy/9WpA=
+gitlab.unanet.io/devops/eve v0.0.0-20200506175551-5499c5a064e3 h1:99zcsyoP00OBd6W4GZrYH5z9zD6lkOo6tFirs7ONQCY=
+gitlab.unanet.io/devops/eve v0.0.0-20200506175551-5499c5a064e3/go.mod h1:aWx4BKjquGRj540732Mb8iCEJzi3v1aMVZ+LRy/9WpA=
 go.etcd.io/bbolt v1.3.3/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.etcd.io/etcd v0.5.0-alpha.5.0.20191023171146-3cf2f69b5738/go.mod h1:dnLIgRNXwCJa5e+c6mIZCrds/GIG4ncV9HhK5PX7jPg=
 go.mongodb.org/mongo-driver v1.1.0/go.mod h1:u7ryQJ+DOzQmeO7zB6MHyr8jkEQvC8vH7qLUO4lqsUM=

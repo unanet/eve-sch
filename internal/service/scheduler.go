@@ -8,13 +8,14 @@ import (
 	"syscall"
 	"time"
 
+	"gitlab.unanet.io/devops/eve/pkg/eve"
 	"gitlab.unanet.io/devops/eve/pkg/log"
 	"gitlab.unanet.io/devops/eve/pkg/metrics"
 	"gitlab.unanet.io/devops/eve/pkg/queue"
-	"gitlab.unanet.io/devops/eve/pkg/s3"
 	"go.uber.org/zap"
 
 	"gitlab.unanet.io/devops/eve-sch/internal/config"
+	"gitlab.unanet.io/devops/eve-sch/internal/vault"
 )
 
 const (
@@ -29,27 +30,19 @@ type QueueWorker interface {
 	Message(ctx context.Context, qUrl string, m *queue.M) error
 }
 
-type CloudDownloader interface {
-	Download(ctx context.Context, location *s3.Location) ([]byte, error)
-}
-
-type CloudUploader interface {
-	Upload(ctx context.Context, key string, body []byte) (*s3.Location, error)
-}
-
 type SecretsClient interface {
-	GetKVSecretString(path string, key string) (string, error)
-	GetKVSecretMap(path string) (map[string]string, error)
+	GetKVSecretString(ctx context.Context, path string, key string) (string, error)
+	GetKVSecrets(ctx context.Context, path string) (vault.Secrets, error)
 }
 
 type FunctionTrigger interface {
-	Post(ctx context.Context, url string, body interface{}) (*FnResponse, error)
+	Post(ctx context.Context, url string, code string, body interface{}) (*FnResponse, error)
 }
 
 type Scheduler struct {
 	worker     QueueWorker
-	downloader CloudDownloader
-	uploader   CloudUploader
+	downloader eve.CloudDownloader
+	uploader   eve.CloudUploader
 	sigChannel chan os.Signal
 	mServer    *http.Server
 	done       chan bool
@@ -58,7 +51,7 @@ type Scheduler struct {
 	fnTrigger  FunctionTrigger
 }
 
-func NewScheduler(worker QueueWorker, downloader CloudDownloader, uploader CloudUploader, apiQUrl string, vault SecretsClient, fnTrigger FunctionTrigger) *Scheduler {
+func NewScheduler(worker QueueWorker, downloader eve.CloudDownloader, uploader eve.CloudUploader, apiQUrl string, vault SecretsClient, fnTrigger FunctionTrigger) *Scheduler {
 	return &Scheduler{
 		worker:     worker,
 		downloader: downloader,

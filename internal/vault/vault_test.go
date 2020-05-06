@@ -1,6 +1,6 @@
 // +build local
 
-package secrets_test
+package vault_test
 
 import (
 	"testing"
@@ -8,19 +8,19 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"gitlab.unanet.io/devops/eve-sch/internal/config"
-	"gitlab.unanet.io/devops/eve-sch/internal/secrets"
+	"gitlab.unanet.io/devops/eve-sch/internal/vault"
 )
 
 var (
-	c *secrets.Client
+	c *vault.Client
 )
 
-func client(t *testing.T) *secrets.Client {
+func client(t *testing.T) *vault.Client {
 	if c != nil {
 		return c
 	}
 
-	cl, err := secrets.NewClient(config.GetConfig().VaultConfig, secrets.TokenAuthenticatorExistingToken)
+	cl, err := vault.NewClient(config.GetConfig().VaultConfig, vault.TokenParserForExistingToken)
 	require.NoError(t, err)
 	c = cl
 	require.NotNil(t, c)

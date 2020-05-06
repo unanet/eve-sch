@@ -16,42 +16,42 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
-	config2 "gitlab.unanet.io/devops/eve-sch/internal/config"
-	"gitlab.unanet.io/devops/eve-sch/internal/secrets"
+	"gitlab.unanet.io/devops/eve-sch/internal/config"
 	"gitlab.unanet.io/devops/eve-sch/internal/service"
+	"gitlab.unanet.io/devops/eve-sch/internal/vault"
 )
 
 func main() {
-	config := config2.GetConfig()
+	c := config.GetConfig()
 	awsSession, err := session.NewSession(&aws.Config{
-		Region: aws.String(config.AWSRegion),
+		Region: aws.String(c.AWSRegion),
 	})
 	if err != nil {
 		log.Logger.Panic("failed to create aws session", zap.Error(err))
 	}
 
-	vault, err := secrets.NewClient(config.VaultConfig)
+	vault, err := vault.NewClient(c.VaultConfig)
 	if err != nil {
 		log.Logger.Panic("failed to create the vault secrets client")
 	}
 
 	schQueue := queue.NewQ(awsSession, queue.Config{
-		MaxNumberOfMessage: config.SchQMaxNumberOfMessage,
-		QueueURL:           config.SchQUrl,
-		WaitTimeSecond:     config.SchQWaitTimeSecond,
-		VisibilityTimeout:  config.SchQVisibilityTimeout,
+		MaxNumberOfMessage: c.SchQMaxNumberOfMessage,
+		QueueURL:           c.SchQUrl,
+		WaitTimeSecond:     c.SchQWaitTimeSecond,
+		VisibilityTimeout:  c.SchQVisibilityTimeout,
 	})
 
 	s3Uploader := s3.NewUploader(awsSession, s3.Config{
-		Bucket: config.S3Bucket,
+		Bucket: c.S3Bucket,
 	})
 
 	s3Downloader := s3.NewDownloader(awsSession)
 
 	fnTrigger := service.NewFnTrigger(1 * time.Hour)
 
-	worker := queue.NewWorker("eve-sch", schQueue, config.SchQWorkerTimeout)
-	service.NewScheduler(worker, s3Downloader, s3Uploader, config.ApiQUrl, vault, fnTrigger).Start()
+	worker := queue.NewWorker("eve-sch", schQueue, c.SchQWorkerTimeout)
+	service.NewScheduler(worker, s3Downloader, s3Uploader, c.ApiQUrl, vault, fnTrigger).Start()
 }
 
 func kube() {

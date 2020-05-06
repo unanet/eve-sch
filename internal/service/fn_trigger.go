@@ -38,10 +38,14 @@ func NewFnTrigger(timeout time.Duration) *FnCall {
 	return &FnCall{sling: sling}
 }
 
-func (c *FnCall) Post(ctx context.Context, url string, body interface{}) (*FnResponse, error) {
+func (c *FnCall) Post(ctx context.Context, url string, code string, body interface{}) (*FnResponse, error) {
 	var failure string
 	var success FnResponse
-	r, err := c.sling.New().Post(url).BodyJSON(body).Request()
+	r, err := c.sling.New().Post(url).BodyJSON(body).QueryStruct(struct {
+		Code string `json:"code"`
+	}{
+		Code: code,
+	}).Request()
 	if err != nil {
 		return nil, errors.Wrap(err)
 	}

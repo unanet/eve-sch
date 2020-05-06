@@ -9,7 +9,7 @@ import (
 
 	"gitlab.unanet.io/devops/eve/pkg/log"
 
-	"gitlab.unanet.io/devops/eve-sch/internal/secrets"
+	"gitlab.unanet.io/devops/eve-sch/internal/vault"
 )
 
 var (
@@ -17,7 +17,7 @@ var (
 	mutex  = sync.Mutex{}
 )
 
-type VaultConfig = secrets.Config
+type VaultConfig = vault.Config
 
 type Config struct {
 	VaultConfig
@@ -27,6 +27,7 @@ type Config struct {
 	SchQVisibilityTimeout  int64         `split_words:"true" default:"3600"`
 	SchQMaxNumberOfMessage int64         `split_words:"true" default:"10"`
 	SchQWorkerTimeout      time.Duration `split_words:"true" default:"60s"`
+	FnTriggerTimeout       time.Duration `split_words:"true" default:"300s"`
 	S3Bucket               string        `split_words:"true" required:"true"`
 	AWSRegion              string        `split_words:"true" required:"true"`
 	MetricsPort            int           `split_words:"true" default:"3001"`
