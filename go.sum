@@ -704,6 +704,10 @@ gitlab.unanet.io/devops/eve v0.0.0-20200506192324-dc4f39add9f5 h1:lxqVI2KLqxy/7L
 gitlab.unanet.io/devops/eve v0.0.0-20200506192324-dc4f39add9f5/go.mod h1:aWx4BKjquGRj540732Mb8iCEJzi3v1aMVZ+LRy/9WpA=
 gitlab.unanet.io/devops/eve v0.0.0-20200506192637-f29b039965e1 h1:XNWuGma/ZCY14aMPSVLIallIw3RH1Hiyqkew0ZsTZcs=
 gitlab.unanet.io/devops/eve v0.0.0-20200506192637-f29b039965e1/go.mod h1:aWx4BKjquGRj540732Mb8iCEJzi3v1aMVZ+LRy/9WpA=
+gitlab.unanet.io/devops/eve v0.0.0-20200506201025-6e37742ffd2f h1:oDJsrrJludK7pDUseSw3B37jdPCPfdl3KMW2mchwFfs=
+gitlab.unanet.io/devops/eve v0.0.0-20200506201025-6e37742ffd2f/go.mod h1:aWx4BKjquGRj540732Mb8iCEJzi3v1aMVZ+LRy/9WpA=
+gitlab.unanet.io/devops/eve v0.0.0-20200506201310-e17bf86a308d h1:GjcZaRAR2xcQ7d62Wr5mxVXMgtpyjPKs1zVuyiaHsyE=
+gitlab.unanet.io/devops/eve v0.0.0-20200506201310-e17bf86a308d/go.mod h1:aWx4BKjquGRj540732Mb8iCEJzi3v1aMVZ+LRy/9WpA=
 go.etcd.io/bbolt v1.3.3/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.etcd.io/etcd v0.5.0-alpha.5.0.20191023171146-3cf2f69b5738/go.mod h1:dnLIgRNXwCJa5e+c6mIZCrds/GIG4ncV9HhK5PX7jPg=
 go.mongodb.org/mongo-driver v1.1.0/go.mod h1:u7ryQJ+DOzQmeO7zB6MHyr8jkEQvC8vH7qLUO4lqsUM=
