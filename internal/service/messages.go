@@ -99,6 +99,12 @@ func (s *Scheduler) deployNamespace(ctx context.Context, m *queue.M) error {
 		return errors.Wrap(err)
 	}
 
+	if plan.Failed() {
+		plan.Status = eve.DeploymentPlanStatusErrors
+	} else {
+		plan.Status = eve.DeploymentPlanStatusComplete
+	}
+
 	mBody, err := eve.MarshalNSDeploymentPlanToS3LocationBody(ctx, s.uploader, plan)
 	if err != nil {
 		return errors.Wrap(err)
