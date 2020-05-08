@@ -68,12 +68,14 @@ func NewScheduler(worker QueueWorker, downloader eve.CloudDownloader, uploader e
 
 func (s *Scheduler) failAndLogFn(ctx context.Context, service *eve.DeployArtifact, plan *eve.NSDeploymentPlan) func(err error, format string, a ...interface{}) {
 	return func(err error, format string, a ...interface{}) {
+		format = format + " [service:%s]"
+		a = append(a, service.ArtifactName)
 		plan.Message(format, a...)
 		service.Result = eve.DeployArtifactResultFailed
 		if err == nil {
-			s.Logger(ctx).Error(fmt.Sprintf(format, a...))
+			s.Logger(ctx).Error(fmt.Sprintf(format, a...), zap.String("service", service.ArtifactName))
 		} else {
-			s.Logger(ctx).Error(fmt.Sprintf(format, a...), zap.Error(err))
+			s.Logger(ctx).Error(fmt.Sprintf(format, a...), zap.String("service", service.ArtifactName), zap.Error(err))
 		}
 	}
 }
