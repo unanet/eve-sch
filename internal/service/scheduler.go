@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -62,6 +63,18 @@ func NewScheduler(worker QueueWorker, downloader eve.CloudDownloader, uploader e
 		apiQUrl:    apiQUrl,
 		vault:      vault,
 		fnTrigger:  fnTrigger,
+	}
+}
+
+func (s *Scheduler) failAndLogFn(ctx context.Context, service *eve.DeployArtifact, plan *eve.NSDeploymentPlan) func(err error, format string, a ...interface{}) {
+	return func(err error, format string, a ...interface{}) {
+		plan.Message(format, a...)
+		service.Result = eve.DeployArtifactResultFailed
+		if err == nil {
+			s.Logger(ctx).Error(fmt.Sprintf(format, a...))
+		} else {
+			s.Logger(ctx).Error(fmt.Sprintf(format, a...), zap.Error(err))
+		}
 	}
 }
 

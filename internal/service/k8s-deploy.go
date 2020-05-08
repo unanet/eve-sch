@@ -133,10 +133,10 @@ export {{ $k | toUpper }}={{ $v }}
 }
 
 func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.DeployService, plan *eve.NSDeploymentPlan) {
+	fail := s.failAndLogFn(ctx, service.DeployArtifact, plan)
 	k8s, err := getK8sClient()
 	if err != nil {
-		service.Result = eve.DeployArtifactResultFailed
-		plan.Message("an error occurred trying to get the k8s client: %s", err)
+		fail(err, "an error occurred trying to get the k8s client")
 		return
 	}
 	var instanceCount int32 = 2
@@ -151,22 +151,19 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 			// This app hasn't been deployed yet so we need to deploy it
 			_, err = k8s.AppsV1().Deployments(plan.Namespace.Name).Create(ctx, deployment, metav1.CreateOptions{})
 			if err != nil {
-				service.Result = eve.DeployArtifactResultFailed
-				plan.Message("an error occurred trying to create the deployment: %s", err)
+				fail(err, "an error occurred trying to create the deployment")
 				return
 			}
 		} else {
 			// an error occurred trying to see if the app is already deployed
-			service.Result = eve.DeployArtifactResultFailed
-			plan.Message("an error occurred trying to create the deployment: %s", err)
+			fail(err, "an error occurred trying to check for the deployment")
 			return
 		}
 	} else {
 		// we were able to retrieve the app which mean we need to run update instead of create
 		_, err := k8s.AppsV1().Deployments(plan.Namespace.Name).Update(ctx, deployment, metav1.UpdateOptions{})
 		if err != nil {
-			service.Result = eve.DeployArtifactResultFailed
-			plan.Message("an error occurred trying to update the deployment: %s", err)
+			fail(err, "an error occurred trying to update the deployment")
 			return
 		}
 	}
@@ -178,8 +175,8 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 		TimeoutSeconds: int64Ptr(60),
 	})
 	if err != nil {
-		service.Result = eve.DeployArtifactResultFailed
-		plan.Message("an error occurred trying to watch the pods: %s", err)
+		fail(err, "an error occurred trying to watch the pods, deployment may have succeeded")
+		return
 	}
 	started := make(map[string]bool)
 
@@ -201,8 +198,7 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 	}
 
 	if len(started) != int(instanceCount) {
-		service.Result = eve.DeployArtifactResultFailed
-		plan.Message("an error occurred while trying to deploy: %s, timed out waiting for app to start.", service.ArtifactName)
+		fail(nil, "an error occurred while trying to deploy: %s, timed out waiting for app to start.", service.ArtifactName)
 	}
 }
 

@@ -25,19 +25,28 @@ func (s *Scheduler) getFunctionCode(ctx context.Context, function string) string
 	return "empty"
 }
 
-func (s *Scheduler) triggerFunction(ctx context.Context, service *eve.DeployArtifact, plan *eve.NSDeploymentPlan) {
-	secretPaths := strings.Split(service.InjectVaultPaths, ",")
+func (s *Scheduler) getSecrets(ctx context.Context, paths string) vault.Secrets {
 	var secrets vault.Secrets = make(map[string]string)
+	if len(paths) == 0 {
+		return secrets
+	}
+	secretPaths := strings.Split(paths, ",")
 	for _, x := range secretPaths {
 		ps, err := s.vault.GetKVSecrets(ctx, x)
 		if err != nil {
-			plan.Message("failed to load secrets from: %s, error: %s", x, err)
+			s.Logger(ctx).Error("failed to load secrets", zap.String("path", x), zap.Error(err))
+			continue
 		}
 		for k, v := range ps {
 			secrets[k] = v
 		}
 	}
 
+	return secrets
+}
+
+func (s *Scheduler) triggerFunction(ctx context.Context, service *eve.DeployArtifact, plan *eve.NSDeploymentPlan) {
+	secrets := s.getSecrets(ctx, service.InjectVaultPaths)
 	payload := make(map[string]interface{})
 	for k, v := range service.Metadata {
 		payload[k] = v
