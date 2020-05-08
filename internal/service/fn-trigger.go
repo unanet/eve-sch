@@ -46,6 +46,7 @@ func (s *Scheduler) getSecrets(ctx context.Context, paths string) vault.Secrets 
 }
 
 func (s *Scheduler) triggerFunction(ctx context.Context, service *eve.DeployArtifact, plan *eve.NSDeploymentPlan) {
+	fail := s.failAndLogFn(ctx, service, plan)
 	secrets := s.getSecrets(ctx, service.InjectVaultPaths)
 	payload := make(map[string]interface{})
 	for k, v := range service.Metadata {
@@ -68,8 +69,7 @@ func (s *Scheduler) triggerFunction(ctx context.Context, service *eve.DeployArti
 
 	resp, err := s.fnTrigger.Post(ctx, service.ArtifactFnPtr, fnCode, payload)
 	if err != nil {
-		plan.Message("artifact deployment failed for: %s", service.ArtifactName)
-		service.Result = eve.DeployArtifactResultFailed
+		fail(err, "function trigger for artifact failed")
 		return
 	}
 
