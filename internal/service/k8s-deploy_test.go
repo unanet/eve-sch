@@ -1,3 +1,5 @@
+// +build local
+
 package service_test
 
 import (
