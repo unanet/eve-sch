@@ -17,6 +17,7 @@ import (
 	"k8s.io/client-go/rest"
 
 	"gitlab.unanet.io/devops/eve-sch/internal/config"
+	"gitlab.unanet.io/devops/eve-sch/internal/fn"
 	"gitlab.unanet.io/devops/eve-sch/internal/service"
 	"gitlab.unanet.io/devops/eve-sch/internal/vault"
 )
@@ -48,7 +49,7 @@ func main() {
 
 	s3Downloader := s3.NewDownloader(awsSession)
 
-	fnTrigger := service.NewFnTrigger(1 * time.Hour)
+	fnTrigger := fn.NewTrigger(1 * time.Hour)
 
 	worker := queue.NewWorker("eve-sch", schQueue, c.SchQWorkerTimeout)
 	service.NewScheduler(worker, s3Downloader, s3Uploader, c.ApiQUrl, vault, fnTrigger).Start()

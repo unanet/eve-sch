@@ -28,26 +28,21 @@ func (s *Scheduler) deployNamespace(ctx context.Context, m *queue.M) error {
 		return errors.Wrap(err)
 	}
 
-	secrets, err := s.vault.GetKVSecrets(ctx, plan.Namespace.ClusterName)
-	if err != nil {
-		return errors.Wrap(err)
-	}
-
 	for _, x := range plan.Services {
 		if x.ArtifactoryFeedType == eve.ArtifactoryFeedTypeDocker {
-			s.deployDockerService(ctx, secrets, x, plan)
+			s.deployDockerService(ctx, x, plan)
 		}
 		if len(x.ArtifactFnPtr) > 0 {
-			s.triggerFunction(ctx, secrets, x.DeployArtifact, plan)
+			s.triggerFunction(ctx, x.DeployArtifact, plan)
 		}
 	}
 
 	for _, x := range plan.Migrations {
 		if x.ArtifactoryFeedType == eve.ArtifactoryFeedTypeDocker {
-			s.runDockerMigrationJob(ctx, secrets, x, plan)
+			s.runDockerMigrationJob(ctx, x, plan)
 		}
 		if len(x.ArtifactFnPtr) > 0 {
-			s.triggerFunction(ctx, secrets, x.DeployArtifact, plan)
+			s.triggerFunction(ctx, x.DeployArtifact, plan)
 		}
 	}
 

@@ -1,4 +1,4 @@
-package service
+package fn
 
 import (
 	"context"
@@ -17,16 +17,16 @@ const (
 	userAgent = "eve"
 )
 
-type FnResponse struct {
+type Response struct {
 	Result   string   `json:"result"`
 	Messages []string `json:"messages"`
 }
 
-type FnCall struct {
+type Trigger struct {
 	sling *sling.Sling
 }
 
-func NewFnTrigger(timeout time.Duration) *FnCall {
+func NewTrigger(timeout time.Duration) *Trigger {
 	var httpClient = &http.Client{
 		Timeout:   timeout,
 		Transport: ehttp.LoggingTransport,
@@ -35,12 +35,12 @@ func NewFnTrigger(timeout time.Duration) *FnCall {
 	sling := sling.New().Client(httpClient).
 		Add("User-Agent", userAgent).
 		ResponseDecoder(json.NewJsonDecoder())
-	return &FnCall{sling: sling}
+	return &Trigger{sling: sling}
 }
 
-func (c *FnCall) Post(ctx context.Context, url string, code string, body interface{}) (*FnResponse, error) {
+func (c *Trigger) Post(ctx context.Context, url string, code string, body interface{}) (*Response, error) {
 	var failure string
-	var success FnResponse
+	var success Response
 	r, err := c.sling.New().Post(url).BodyJSON(body).QueryStruct(struct {
 		Code string `json:"code"`
 	}{

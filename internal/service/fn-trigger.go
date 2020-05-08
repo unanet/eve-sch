@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 
 	"gitlab.unanet.io/devops/eve/pkg/eve"
 	"go.uber.org/zap"
@@ -24,7 +25,19 @@ func (s *Scheduler) getFunctionCode(ctx context.Context, function string) string
 	return "empty"
 }
 
-func (s *Scheduler) triggerFunction(ctx context.Context, secrets vault.Secrets, service *eve.DeployArtifact, plan *eve.NSDeploymentPlan) {
+func (s *Scheduler) triggerFunction(ctx context.Context, service *eve.DeployArtifact, plan *eve.NSDeploymentPlan) {
+	secretPaths := strings.Split(service.InjectVaultPaths, ",")
+	var secrets vault.Secrets = make(map[string]string)
+	for _, x := range secretPaths {
+		ps, err := s.vault.GetKVSecrets(ctx, x)
+		if err != nil {
+			plan.Message("failed to load secrets from: %s, error: %s", x, err)
+		}
+		for k, v := range ps {
+			secrets[k] = v
+		}
+	}
+
 	payload := make(map[string]interface{})
 	for k, v := range service.Metadata {
 		payload[k] = v

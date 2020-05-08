@@ -15,6 +15,7 @@ import (
 	"go.uber.org/zap"
 
 	"gitlab.unanet.io/devops/eve-sch/internal/config"
+	"gitlab.unanet.io/devops/eve-sch/internal/fn"
 	"gitlab.unanet.io/devops/eve-sch/internal/vault"
 )
 
@@ -36,7 +37,7 @@ type SecretsClient interface {
 }
 
 type FunctionTrigger interface {
-	Post(ctx context.Context, url string, code string, body interface{}) (*FnResponse, error)
+	Post(ctx context.Context, url string, code string, body interface{}) (*fn.Response, error)
 }
 
 type Scheduler struct {

@@ -352,6 +352,12 @@ github.com/zenazn/goji v0.9.0/go.mod h1:7S9M489iMyHBNxwZnk9/EHS098H4/F6TATF2mIxt
 gitlab.com/nyarla/go-crypt v0.0.0-20160106005555-d9a5dc2b789b/go.mod h1:T3BPAOm2cqquPa0MKWeNkmOM5RQsRhkrwMWonFMN7fE=
 gitlab.unanet.io/devops/eve v0.0.0-20200506201310-e17bf86a308d h1:GjcZaRAR2xcQ7d62Wr5mxVXMgtpyjPKs1zVuyiaHsyE=
 gitlab.unanet.io/devops/eve v0.0.0-20200506201310-e17bf86a308d/go.mod h1:aWx4BKjquGRj540732Mb8iCEJzi3v1aMVZ+LRy/9WpA=
+gitlab.unanet.io/devops/eve v0.0.0-20200508153210-d9c2a5ff17eb h1:X2EB6rfUa43sgd6IZ58pPg3y25gRT/QGMmTJVODEBzI=
+gitlab.unanet.io/devops/eve v0.0.0-20200508153210-d9c2a5ff17eb/go.mod h1:aWx4BKjquGRj540732Mb8iCEJzi3v1aMVZ+LRy/9WpA=
+gitlab.unanet.io/devops/eve v0.0.0-20200508161048-9c9bf23b052c h1:sNW6zRbwOoILlG+AIIpUg1kminOx4imjugUum/FPJZQ=
+gitlab.unanet.io/devops/eve v0.0.0-20200508161048-9c9bf23b052c/go.mod h1:aWx4BKjquGRj540732Mb8iCEJzi3v1aMVZ+LRy/9WpA=
+gitlab.unanet.io/devops/eve v0.0.0-20200508232112-da774a9f80c2 h1:qXK45l8DH549TNWDXvzSK2V3wMWlkYbLJXqiyUn64W0=
+gitlab.unanet.io/devops/eve v0.0.0-20200508232112-da774a9f80c2/go.mod h1:aWx4BKjquGRj540732Mb8iCEJzi3v1aMVZ+LRy/9WpA=
 go.mongodb.org/mongo-driver v1.1.0/go.mod h1:u7ryQJ+DOzQmeO7zB6MHyr8jkEQvC8vH7qLUO4lqsUM=
 go.opencensus.io v0.20.1/go.mod h1:6WKK9ahsWS3RSO+PY9ZHZUfv2irvY6gN279GOPZjmmk=
 go.opencensus.io v0.21.0/go.mod h1:mSImk1erAIZhrmZN+AvHh14ztQfjbGwt4TtuofqLduU=
