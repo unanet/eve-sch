@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 
 	"gitlab.unanet.io/devops/eve/pkg/eve"
 	"go.uber.org/zap"
@@ -52,9 +51,6 @@ func (s *Scheduler) triggerFunction(ctx context.Context, service *eve.DeployArti
 	for k, v := range secrets {
 		payload[k] = v
 	}
-
-	json, _ := json.Marshal(&payload)
-	s.Logger(ctx).Info("###################### PAYLOAD ######################", zap.ByteString("payload", json))
 
 	fnCode := s.getFunctionCode(ctx, service.ArtifactFnPtr)
 
