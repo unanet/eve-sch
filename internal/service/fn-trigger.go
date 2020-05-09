@@ -52,14 +52,6 @@ func (s *Scheduler) triggerFunction(ctx context.Context, service *eve.DeployArti
 		payload[k] = v
 	}
 
-	payload["environment"] = plan.EnvironmentName
-	payload["namespace"] = plan.Namespace.Alias
-	payload["cluster"] = plan.Namespace.ClusterName
-	payload["artifact_name"] = service.ArtifactName
-	payload["artifact_version"] = service.AvailableVersion
-	payload["artifact_repo"] = service.ArtifactoryFeed
-	payload["artifact_path"] = service.ArtifactoryPath
-
 	fnCode := s.getFunctionCode(ctx, service.ArtifactFnPtr)
 
 	resp, err := s.fnTrigger.Post(ctx, service.ArtifactFnPtr, fnCode, payload)

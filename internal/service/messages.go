@@ -6,7 +6,6 @@ import (
 	"gitlab.unanet.io/devops/eve/pkg/errors"
 	"gitlab.unanet.io/devops/eve/pkg/eve"
 	"gitlab.unanet.io/devops/eve/pkg/queue"
-	"go.uber.org/zap"
 )
 
 const (
@@ -33,7 +32,7 @@ func (s *Scheduler) deployNamespace(ctx context.Context, m *queue.M) error {
 		var vaultPaths []string
 		x.Metadata, vaultPaths, err = ParseServiceMetadata(x.Metadata, x, plan)
 		if err != nil {
-			s.Logger(ctx).Error("unable to parse metadata", zap.Error(err))
+			plan.Message("could not parse metadata, service: %s, error: %s", x.ArtifactName, err)
 		}
 		if x.ArtifactoryFeedType == eve.ArtifactoryFeedTypeDocker {
 			s.deployDockerService(ctx, x, plan, vaultPaths)
@@ -47,7 +46,7 @@ func (s *Scheduler) deployNamespace(ctx context.Context, m *queue.M) error {
 		var vaultPaths []string
 		x.Metadata, vaultPaths, err = ParseMigrationMetadata(x.Metadata, x, plan)
 		if err != nil {
-			s.Logger(ctx).Error("unable to parse metadata", zap.Error(err))
+			plan.Message("could not parse metadata, migration: %s, error: %s", x.ArtifactName, err)
 		}
 
 		if x.ArtifactoryFeedType == eve.ArtifactoryFeedTypeDocker {
