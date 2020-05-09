@@ -10,7 +10,7 @@ require (
 	github.com/golang/protobuf v1.4.1 // indirect
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/stretchr/testify v1.4.0
-	gitlab.unanet.io/devops/eve v0.0.0-20200508232112-da774a9f80c2
+	gitlab.unanet.io/devops/eve v0.0.0-20200509001622-507e3c364962
 	go.uber.org/zap v1.15.0
 	golang.org/x/crypto v0.0.0-20200429183012-4b2356b1ed79 // indirect
 	golang.org/x/net v0.0.0-20200506145744-7e3656a0809f // indirect
