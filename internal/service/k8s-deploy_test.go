@@ -1,28 +1,22 @@
 // +build local
 
-package service_test
+package service
 
 import (
-	"bytes"
+	"context"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/docker/docker/utils/templates"
-	uuid "github.com/satori/go.uuid"
 	"github.com/stretchr/testify/require"
 	"gitlab.unanet.io/devops/eve/pkg/eve"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-
-	service2 "gitlab.unanet.io/devops/eve-sch/internal/service"
 )
-
-func int32Ptr(i int32) *int32 { return &i }
-
-func int64Ptr(i int64) *int64 { return &i }
 
 func homeDir() string {
 	if h := os.Getenv("HOME"); h != "" {
@@ -52,46 +46,25 @@ func GetK8sClient(t *testing.T) *kubernetes.Clientset {
 }
 
 func TestScheduler_deployNamespace(t *testing.T) {
-	service := service2.TemplateServiceData{
-		Plan: &eve.NSDeploymentPlan{
-			DeploymentID: uuid.UUID{},
-			Namespace: &eve.NamespaceRequest{
-				ID:          0,
-				Alias:       "",
-				Name:        "",
-				ClusterID:   0,
-				ClusterName: "",
-			},
-			EnvironmentName: "",
-			Services:        nil,
-			Migrations:      nil,
-			Messages:        nil,
-			SchQueueUrl:     "",
-			CallbackURL:     "",
-			Status:          "",
-		},
-		Service: &eve.DeployService{
-			DeployArtifact: &eve.DeployArtifact{
-				ArtifactID:          0,
-				ArtifactName:        "",
-				RequestedVersion:    "",
-				DeployedVersion:     "",
-				AvailableVersion:    "",
-				Metadata:            nil,
-				ArtifactoryFeed:     "",
-				ArtifactoryPath:     "",
-				ArtifactFnPtr:       "",
-				ArtifactoryFeedType: "",
-				Result:              "",
-				Deploy:              false,
-			},
-			ServiceID: 0,
-		},
+	k8s := GetK8sClient(t)
+	ctx := context.TODO()
+	imageName := getDockerImageName(&eve.DeployArtifact{
+		ArtifactID:          1,
+		ArtifactName:        "infocus-web",
+		AvailableVersion:    "2020.2.0.132",
+		ArtifactoryFeed:     "docker-int",
+		ArtifactoryPath:     "clearview/infocus-web",
+		ArtifactoryFeedType: "docker",
+	})
+	fmt.Println(imageName)
+	deployment := getK8sDeployment(2, "infocus-web", "2020.2.0.132", "cvs-curr-int", imageName)
+	_, err := k8s.AppsV1().Deployments("cvs-curr-int").Get(ctx, "infocus-web", metav1.GetOptions{})
+	if err != nil {
+		if k8sErrors.IsNotFound(err) {
+			result, err := k8s.AppsV1().Deployments("cvs-curr-int").Create(ctx, deployment, metav1.CreateOptions{})
+			require.NoError(t, err)
+			fmt.Println(result)
+		}
 	}
-	json := "{\"cluster\": \"{{ Plan.Namespace.ClusterName }}\", \"namespace\": \"{{ .Plan.Namespace.Alias }}\", \"environment\": \"{{ .Plan.EnvironmentName }}\", \"artifact_name\": \"{{ .Service.ArtifactName }}\", \"artifact_path\": \"{{ .Service.ArtifactoryPath }}\", \"artifact_repo\": \"{{ .Service.ArtifactoryFeed }}\", \"artifact_version\": \"{{ .Service.AvailableVersion }}\", \"inject_vault_paths\": \"{{ .Plan.Namespace.ClusterName }}\"}"
-	temp, err := templates.Parse(json)
-	require.NoError(t, err)
-	var b bytes.Buffer
-	temp.Execute(&b, service)
-	fmt.Println(b.String())
+
 }
