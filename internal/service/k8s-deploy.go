@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -145,11 +146,13 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 	if err != nil {
 		if k8sErrors.IsNotFound(err) {
 			// This app hasn't been deployed yet so we need to deploy it
-			_, err = k8s.AppsV1().Deployments(plan.Namespace.Name).Create(ctx, deployment, metav1.CreateOptions{})
+			result, err := k8s.AppsV1().Deployments(plan.Namespace.Name).Create(ctx, deployment, metav1.CreateOptions{})
 			if err != nil {
 				fail(err, "an error occurred trying to create the deployment")
 				return
 			}
+			json, _ := json.Marshal(result)
+			s.Logger(ctx).Info(string(json))
 		} else {
 			// an error occurred trying to see if the app is already deployed
 			fail(err, "an error occurred trying to check for the deployment")
