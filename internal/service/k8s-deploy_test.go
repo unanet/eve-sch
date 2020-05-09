@@ -3,7 +3,6 @@
 package service_test
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -11,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -48,19 +46,13 @@ func GetK8sClient(t *testing.T) *kubernetes.Clientset {
 }
 
 func TestScheduler_deployNamespace(t *testing.T) {
-	ctx := context.TODO()
-	client := GetK8sClient(t)
-	labelSelector := fmt.Sprintf("app=%s,version=%s", "infocus-web", "2020.2.0.132")
-	pods, err := client.CoreV1().Pods("cvs-curr-int").List(ctx, metav1.ListOptions{
-		LabelSelector: labelSelector,
-	})
-	require.NoError(t, err)
-
-	for _, x := range pods.Items {
-		if x.Status.ContainerStatuses[0].State.Running != nil {
-
-		}
-
+	metadata := map[string]interface{}{
+		"some_value": []string{
+			"test",
+			"test2",
+		},
+		"some_value2": "test1",
 	}
-
+	_, ok := metadata["some_value"].([]string)
+	fmt.Println(ok)
 }

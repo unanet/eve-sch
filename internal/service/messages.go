@@ -6,6 +6,7 @@ import (
 	"gitlab.unanet.io/devops/eve/pkg/errors"
 	"gitlab.unanet.io/devops/eve/pkg/eve"
 	"gitlab.unanet.io/devops/eve/pkg/queue"
+	"go.uber.org/zap"
 )
 
 const (
@@ -29,20 +30,31 @@ func (s *Scheduler) deployNamespace(ctx context.Context, m *queue.M) error {
 	}
 
 	for _, x := range plan.Services {
+		var vaultPaths []string
+		x.Metadata, vaultPaths, err = ParseServiceMetadata(x.Metadata, x, plan)
+		if err != nil {
+			s.Logger(ctx).Error("unable to parse metadata", zap.Error(err))
+		}
 		if x.ArtifactoryFeedType == eve.ArtifactoryFeedTypeDocker {
-			s.deployDockerService(ctx, x, plan)
+			s.deployDockerService(ctx, x, plan, vaultPaths)
 		}
 		if len(x.ArtifactFnPtr) > 0 {
-			s.triggerFunction(ctx, x.DeployArtifact, plan)
+			s.triggerFunction(ctx, x.DeployArtifact, plan, vaultPaths)
 		}
 	}
 
 	for _, x := range plan.Migrations {
+		var vaultPaths []string
+		x.Metadata, vaultPaths, err = ParseMigrationMetadata(x.Metadata, x, plan)
+		if err != nil {
+			s.Logger(ctx).Error("unable to parse metadata", zap.Error(err))
+		}
+
 		if x.ArtifactoryFeedType == eve.ArtifactoryFeedTypeDocker {
-			s.runDockerMigrationJob(ctx, x, plan)
+			s.runDockerMigrationJob(ctx, x, plan, vaultPaths)
 		}
 		if len(x.ArtifactFnPtr) > 0 {
-			s.triggerFunction(ctx, x.DeployArtifact, plan)
+			s.triggerFunction(ctx, x.DeployArtifact, plan, vaultPaths)
 		}
 	}
 

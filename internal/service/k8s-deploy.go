@@ -23,8 +23,6 @@ const (
 
 func int32Ptr(i int32) *int32 { return &i }
 
-func intPtr(i int) *int { return &i }
-
 func int64Ptr(i int64) *int64 { return &i }
 
 func getDockerImageName(artifact *eve.DeployArtifact) string {
@@ -33,17 +31,17 @@ func getDockerImageName(artifact *eve.DeployArtifact) string {
 }
 
 func getK8sClient() (*kubernetes.Clientset, error) {
-	config, err := rest.InClusterConfig()
+	c, err := rest.InClusterConfig()
 	if err != nil {
 		return nil, errors.Wrap(err)
 	}
 
-	clientset, err := kubernetes.NewForConfig(config)
+	client, err := kubernetes.NewForConfig(c)
 	if err != nil {
 		return nil, errors.Wrap(err)
 	}
 
-	return clientset, nil
+	return client, nil
 }
 
 func getK8sDeployment(instanceCount int32, artifactName, artifactVersion, namespace, containerImage string) *appsv1.Deployment {
@@ -109,16 +107,12 @@ func setupEnvironment(metadata map[string]interface{}, deployment *appsv1.Deploy
 	deployment.Spec.Template.Spec.Containers[0].Env = containerEnvVars
 }
 
-func setupVaultInjection(vaultPathToInject string, deployment *appsv1.Deployment) {
-	if len(vaultPathToInject) == 0 {
-		return
-	}
+func setupVaultInjection(paths []string, deployment *appsv1.Deployment) {
 	annotations := map[string]string{
 		"vault.hashicorp.com/agent-inject":            "true",
 		"vault.hashicorp.com/agent-pre-populate-only": "true",
 	}
 
-	paths := strings.Split(vaultPathToInject, ",")
 	for _, x := range paths {
 		annotationPath := strings.ReplaceAll(x, "/", "-")
 		annotations[fmt.Sprintf("vault.hashicorp.com/agent-inject-secret-%s", annotationPath)] = fmt.Sprintf("kv/data/%s", x)
@@ -134,7 +128,7 @@ export {{ $k | toUpper }}={{ $v }}
 	deployment.Spec.Template.ObjectMeta.Annotations = annotations
 }
 
-func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.DeployService, plan *eve.NSDeploymentPlan) {
+func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.DeployService, plan *eve.NSDeploymentPlan, vaultPaths []string) {
 	fail := s.failAndLogFn(ctx, service.DeployArtifact, plan)
 	k8s, err := getK8sClient()
 	if err != nil {
@@ -145,7 +139,7 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 	imageName := getDockerImageName(service.DeployArtifact)
 	deployment := getK8sDeployment(instanceCount, service.ArtifactName, service.AvailableVersion, plan.Namespace.Name, imageName)
 	setupEnvironment(service.Metadata, deployment)
-	setupVaultInjection(service.InjectVaultPaths, deployment)
+	setupVaultInjection(vaultPaths, deployment)
 
 	_, err = k8s.AppsV1().Deployments(plan.Namespace.Name).Get(ctx, service.ArtifactName, metav1.GetOptions{})
 	if err != nil {
@@ -231,6 +225,6 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 	service.Result = eve.DeployArtifactResultSuccess
 }
 
-func (s *Scheduler) runDockerMigrationJob(ctx context.Context, migration *eve.DeployMigration, plan *eve.NSDeploymentPlan) {
+func (s *Scheduler) runDockerMigrationJob(ctx context.Context, migration *eve.DeployMigration, plan *eve.NSDeploymentPlan, vaultPaths []string) {
 
 }
