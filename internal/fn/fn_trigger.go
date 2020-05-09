@@ -2,6 +2,7 @@ package fn
 
 import (
 	"context"
+	goJson "encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -40,7 +41,7 @@ func NewTrigger(timeout time.Duration) *Trigger {
 
 func (c *Trigger) Post(ctx context.Context, url string, code string, body interface{}) (*Response, error) {
 	var failure string
-	var success Response
+	var response Response
 	r, err := c.sling.New().Post(url).BodyJSON(body).QueryStruct(struct {
 		Code string `json:"code"`
 	}{
@@ -49,13 +50,17 @@ func (c *Trigger) Post(ctx context.Context, url string, code string, body interf
 	if err != nil {
 		return nil, errors.Wrap(err)
 	}
-	resp, err := c.sling.Do(r.WithContext(ctx), &success, &failure)
+	resp, err := c.sling.Do(r.WithContext(ctx), &response, &failure)
 	if err != nil {
 		return nil, errors.Wrap(err)
 	}
 	if http.StatusOK == resp.StatusCode {
-		return &success, nil
+		return &response, nil
 	} else {
+		_ = goJson.Unmarshal([]byte(failure), &response)
+		if response.Result != "" {
+			return &response, nil
+		}
 		return nil, errors.Wrap(fmt.Errorf(failure))
 	}
 }

@@ -3,15 +3,21 @@
 package service_test
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/docker/docker/utils/templates"
+	uuid "github.com/satori/go.uuid"
 	"github.com/stretchr/testify/require"
+	"gitlab.unanet.io/devops/eve/pkg/eve"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+
+	service2 "gitlab.unanet.io/devops/eve-sch/internal/service"
 )
 
 func int32Ptr(i int32) *int32 { return &i }
@@ -46,13 +52,46 @@ func GetK8sClient(t *testing.T) *kubernetes.Clientset {
 }
 
 func TestScheduler_deployNamespace(t *testing.T) {
-	metadata := map[string]interface{}{
-		"some_value": []string{
-			"test",
-			"test2",
+	service := service2.TemplateServiceData{
+		Plan: &eve.NSDeploymentPlan{
+			DeploymentID: uuid.UUID{},
+			Namespace: &eve.NamespaceRequest{
+				ID:          0,
+				Alias:       "",
+				Name:        "",
+				ClusterID:   0,
+				ClusterName: "",
+			},
+			EnvironmentName: "",
+			Services:        nil,
+			Migrations:      nil,
+			Messages:        nil,
+			SchQueueUrl:     "",
+			CallbackURL:     "",
+			Status:          "",
 		},
-		"some_value2": "test1",
+		Service: &eve.DeployService{
+			DeployArtifact: &eve.DeployArtifact{
+				ArtifactID:          0,
+				ArtifactName:        "",
+				RequestedVersion:    "",
+				DeployedVersion:     "",
+				AvailableVersion:    "",
+				Metadata:            nil,
+				ArtifactoryFeed:     "",
+				ArtifactoryPath:     "",
+				ArtifactFnPtr:       "",
+				ArtifactoryFeedType: "",
+				Result:              "",
+				Deploy:              false,
+			},
+			ServiceID: 0,
+		},
 	}
-	_, ok := metadata["some_value"].([]string)
-	fmt.Println(ok)
+	json := "{\"cluster\": \"{{ Plan.Namespace.ClusterName }}\", \"namespace\": \"{{ .Plan.Namespace.Alias }}\", \"environment\": \"{{ .Plan.EnvironmentName }}\", \"artifact_name\": \"{{ .Service.ArtifactName }}\", \"artifact_path\": \"{{ .Service.ArtifactoryPath }}\", \"artifact_repo\": \"{{ .Service.ArtifactoryFeed }}\", \"artifact_version\": \"{{ .Service.AvailableVersion }}\", \"inject_vault_paths\": \"{{ .Plan.Namespace.ClusterName }}\"}"
+	temp, err := templates.Parse(json)
+	require.NoError(t, err)
+	var b bytes.Buffer
+	temp.Execute(&b, service)
+	fmt.Println(b.String())
 }
