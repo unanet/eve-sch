@@ -27,7 +27,7 @@ func int64Ptr(i int64) *int64 { return &i }
 
 func getDockerImageName(artifact *eve.DeployArtifact) string {
 	repo := fmt.Sprintf(DockerRepoFormat, artifact.ArtifactoryFeed)
-	return fmt.Sprintf("%s/%s/%s:%s", repo, artifact.ArtifactoryPath, artifact.ArtifactName, artifact.AvailableVersion)
+	return fmt.Sprintf("%s/%s:%s", repo, artifact.ArtifactoryPath, artifact.AvailableVersion)
 }
 
 func getK8sClient() (*kubernetes.Clientset, error) {
