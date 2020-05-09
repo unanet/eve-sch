@@ -11,8 +11,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	appsv1 "k8s.io/api/apps/v1"
-	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -52,86 +50,17 @@ func GetK8sClient(t *testing.T) *kubernetes.Clientset {
 func TestScheduler_deployNamespace(t *testing.T) {
 	ctx := context.TODO()
 	client := GetK8sClient(t)
-	deployment := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "infocus-web",
-			Namespace: "cvs-int",
-		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas: int32Ptr(2),
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					"app": "infocus-web",
-				},
-			},
-			Template: apiv1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"app":     "infocus-web",
-						"version": "2020.13",
-					},
-				},
-				Spec: apiv1.PodSpec{
-					Containers: []apiv1.Container{
-						{
-							Name:            "infocus-web",
-							ImagePullPolicy: apiv1.PullAlways,
-							Image:           "unanet-docker-int.jfrog.io/clearview/infocus-web:2020.2",
-							Ports: []apiv1.ContainerPort{
-								{
-									Name:          "http",
-									Protocol:      apiv1.ProtocolTCP,
-									ContainerPort: 80,
-								},
-							},
-							Env: []apiv1.EnvVar{
-								{
-									Name:  "ASPNETCORE_ENVIRONMENT",
-									Value: "Production",
-								},
-							},
-						},
-					},
-					ImagePullSecrets: []apiv1.LocalObjectReference{
-						{
-							Name: "docker-cfg",
-						},
-					},
-				},
-			},
-		},
-	}
-
-	deploymentsClient := client.AppsV1().Deployments("cvs-int")
-	_, err := deploymentsClient.Update(ctx, deployment, metav1.UpdateOptions{})
-	require.NoError(t, err)
-	podsClient := client.CoreV1().Pods("cvs-int")
-	watch, err := podsClient.Watch(ctx, metav1.ListOptions{
-		TypeMeta:       metav1.TypeMeta{},
-		LabelSelector:  "app=infocus-web,version=2020.13",
-		TimeoutSeconds: int64Ptr(60),
+	labelSelector := fmt.Sprintf("app=%s,version=%s", "infocus-web", "2020.2.0.132")
+	pods, err := client.CoreV1().Pods("cvs-curr-int").List(ctx, metav1.ListOptions{
+		LabelSelector: labelSelector,
 	})
 	require.NoError(t, err)
-	started := make(map[string]bool)
 
-	for event := range watch.ResultChan() {
-		p, ok := event.Object.(*apiv1.Pod)
-		if !ok {
-			continue
-		}
-		for _, x := range p.Status.ContainerStatuses {
-			if !*x.Started {
-				continue
-			}
+	for _, x := range pods.Items {
+		if x.Status.ContainerStatuses[0].State.Running != nil {
 
-			fmt.Println(p.Name)
-			started[p.Name] = true
 		}
 
-		fmt.Println(started)
-		if len(started) == 2 {
-			watch.Stop()
-		}
 	}
 
 }

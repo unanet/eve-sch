@@ -28,6 +28,7 @@ type Config struct {
 	SchQMaxNumberOfMessage int64         `split_words:"true" default:"1"`
 	SchQWorkerTimeout      time.Duration `split_words:"true" default:"900s"`
 	FnTriggerTimeout       time.Duration `split_words:"true" default:"300s"`
+	K8sDeployTimeoutSec    int64         `split_words:"true" default:"300"`
 	S3Bucket               string        `split_words:"true" required:"true"`
 	AWSRegion              string        `split_words:"true" required:"true"`
 	MetricsPort            int           `split_words:"true" default:"3001"`

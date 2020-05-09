@@ -13,6 +13,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+
+	"gitlab.unanet.io/devops/eve-sch/internal/config"
 )
 
 const (
@@ -168,11 +170,12 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 		}
 	}
 
+	labelSelector := fmt.Sprintf("app=%s,version=%s", service.ArtifactName, service.AvailableVersion)
 	pods := k8s.CoreV1().Pods(plan.Namespace.Name)
 	watch, err := pods.Watch(ctx, metav1.ListOptions{
 		TypeMeta:       metav1.TypeMeta{},
-		LabelSelector:  fmt.Sprintf("app=%s,version=%s", service.ArtifactName, service.AvailableVersion),
-		TimeoutSeconds: int64Ptr(60),
+		LabelSelector:  labelSelector,
+		TimeoutSeconds: int64Ptr(config.GetConfig().K8sDeployTimeoutSec),
 	})
 	if err != nil {
 		fail(err, "an error occurred trying to watch the pods, deployment may have succeeded")
@@ -198,8 +201,31 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 	}
 
 	if len(started) != int(instanceCount) {
-		fail(nil, "an error occurred while trying to deploy: %s, timed out waiting for app to start.", service.ArtifactName)
-		return
+		// make sure we don't get a false positive and actually check
+		pods, err := k8s.CoreV1().Pods(plan.Namespace.Name).List(ctx, metav1.ListOptions{
+			LabelSelector: labelSelector,
+		})
+		if err != nil {
+			fail(nil, "an error occurred while trying to deploy: %s, timed out waiting for app to start.", service.ArtifactName)
+			return
+		}
+
+		if len(pods.Items) != int(instanceCount) {
+			fail(nil, "an error occurred while trying to deploy: %s, timed out waiting for app to start.", service.ArtifactName)
+			return
+		}
+
+		var startedCount int
+		for _, x := range pods.Items {
+			if x.Status.ContainerStatuses[0].State.Running != nil {
+				startedCount += 1
+			}
+		}
+
+		if startedCount != int(instanceCount) {
+			fail(nil, "an error occurred while trying to deploy: %s, timed out waiting for app to start.", service.ArtifactName)
+			return
+		}
 	}
 
 	service.Result = eve.DeployArtifactResultSuccess
