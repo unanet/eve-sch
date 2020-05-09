@@ -111,6 +111,7 @@ func setupVaultInjection(paths []string, deployment *appsv1.Deployment) {
 	annotations := map[string]string{
 		"vault.hashicorp.com/agent-inject":            "true",
 		"vault.hashicorp.com/agent-pre-populate-only": "true",
+		"vault.hashicorp.com/role":                    "eve-sch",
 	}
 
 	for _, x := range paths {
