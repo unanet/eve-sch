@@ -143,6 +143,7 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 	setupVaultInjection(vaultPaths, deployment)
 
 	_, err = k8s.AppsV1().Deployments(plan.Namespace.Name).Get(ctx, service.ArtifactName, metav1.GetOptions{})
+	s.Logger(ctx).Info("##################111111111111111111###############")
 	if err != nil {
 		if k8sErrors.IsNotFound(err) {
 			// This app hasn't been deployed yet so we need to deploy it
@@ -159,12 +160,16 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 			return
 		}
 	} else {
+		s.Logger(ctx).Info("##################22222222222###############")
+
 		// we were able to retrieve the app which mean we need to run update instead of create
-		_, err := k8s.AppsV1().Deployments(plan.Namespace.Name).Update(ctx, deployment, metav1.UpdateOptions{})
+		result, err := k8s.AppsV1().Deployments(plan.Namespace.Name).Update(ctx, deployment, metav1.UpdateOptions{})
 		if err != nil {
 			fail(err, "an error occurred trying to update the deployment")
 			return
 		}
+		json, _ := json.Marshal(result)
+		s.Logger(ctx).Info(string(json))
 	}
 
 	labelSelector := fmt.Sprintf("app=%s,version=%s", service.ArtifactName, service.AvailableVersion)
