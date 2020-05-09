@@ -200,6 +200,8 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 	if len(started) != int(instanceCount) {
 		fail(nil, "an error occurred while trying to deploy: %s, timed out waiting for app to start.", service.ArtifactName)
 	}
+
+	service.Result = eve.DeployArtifactResultSuccess
 }
 
 func (s *Scheduler) runDockerMigrationJob(ctx context.Context, migration *eve.DeployMigration, plan *eve.NSDeploymentPlan) {
