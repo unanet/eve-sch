@@ -199,6 +199,7 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 
 	if len(started) != int(instanceCount) {
 		fail(nil, "an error occurred while trying to deploy: %s, timed out waiting for app to start.", service.ArtifactName)
+		return
 	}
 
 	service.Result = eve.DeployArtifactResultSuccess
