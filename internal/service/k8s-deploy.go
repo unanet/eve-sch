@@ -109,6 +109,10 @@ func setupEnvironment(metadata map[string]interface{}, deployment *appsv1.Deploy
 }
 
 func setupVaultInjection(paths []string, deployment *appsv1.Deployment) {
+	if len(paths) == 0 {
+		return
+	}
+
 	annotations := map[string]string{
 		"vault.hashicorp.com/agent-inject":            "true",
 		"vault.hashicorp.com/agent-pre-populate-only": "true",
