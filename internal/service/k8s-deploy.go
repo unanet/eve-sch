@@ -3,7 +3,9 @@ package service
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	"gitlab.unanet.io/devops/eve/pkg/errors"
 	"gitlab.unanet.io/devops/eve/pkg/eve"
@@ -45,6 +47,7 @@ func getK8sClient() (*kubernetes.Clientset, error) {
 }
 
 func getK8sDeployment(instanceCount int32, artifactName, artifactVersion, namespace, containerImage string) *appsv1.Deployment {
+	timeNuance := strconv.Itoa(int(time.Now().Unix()))
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      artifactName,
@@ -54,7 +57,9 @@ func getK8sDeployment(instanceCount int32, artifactName, artifactVersion, namesp
 			Replicas: int32Ptr(instanceCount),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"app": artifactName,
+					"app":     artifactName,
+					"version": artifactVersion,
+					"nuance":  timeNuance,
 				},
 			},
 			Template: apiv1.PodTemplateSpec{
@@ -62,6 +67,7 @@ func getK8sDeployment(instanceCount int32, artifactName, artifactVersion, namesp
 					Labels: map[string]string{
 						"app":     artifactName,
 						"version": artifactVersion,
+						"nuance":  timeNuance,
 					},
 				},
 				Spec: apiv1.PodSpec{
