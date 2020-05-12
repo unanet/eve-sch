@@ -59,7 +59,6 @@ func getK8sDeployment(instanceCount int32, artifactName, artifactVersion, namesp
 				MatchLabels: map[string]string{
 					"app":     artifactName,
 					"version": artifactVersion,
-					"nuance":  timeNuance,
 				},
 			},
 			Template: apiv1.PodTemplateSpec{
