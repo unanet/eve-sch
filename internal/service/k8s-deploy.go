@@ -71,7 +71,7 @@ func getK8sDeployment(instanceCount int32, artifactName, artifactVersion, namesp
 					},
 				},
 				Spec: apiv1.PodSpec{
-					ServiceAccountName: "cvs",
+					ServiceAccountName: "unanet",
 					Containers: []apiv1.Container{
 						{
 							Name:            artifactName,
