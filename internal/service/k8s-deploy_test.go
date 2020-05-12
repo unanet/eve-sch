@@ -57,7 +57,7 @@ func TestScheduler_deployNamespace(t *testing.T) {
 		ArtifactoryFeedType: "docker",
 	})
 	fmt.Println(imageName)
-	deployment := getK8sDeployment(2, "infocus-web", "2020.2.0.132", "cvs-curr-int", imageName)
+	deployment := getK8sDeployment(2, "infocus-web", "2020.2.0.132", "cvs-curr-int", imageName, "")
 	_, err := k8s.AppsV1().Deployments("cvs-curr-int").Get(ctx, "infocus-web", metav1.GetOptions{})
 	if err != nil {
 		if k8sErrors.IsNotFound(err) {

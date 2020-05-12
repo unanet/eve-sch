@@ -46,8 +46,7 @@ func getK8sClient() (*kubernetes.Clientset, error) {
 	return client, nil
 }
 
-func getK8sDeployment(instanceCount int32, artifactName, artifactVersion, namespace, containerImage string) *appsv1.Deployment {
-	timeNuance := strconv.Itoa(int(time.Now().Unix()))
+func getK8sDeployment(instanceCount int32, artifactName, artifactVersion, namespace, containerImage, nuance string) *appsv1.Deployment {
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      artifactName,
@@ -66,7 +65,7 @@ func getK8sDeployment(instanceCount int32, artifactName, artifactVersion, namesp
 					Labels: map[string]string{
 						"app":     artifactName,
 						"version": artifactVersion,
-						"nuance":  timeNuance,
+						"nuance":  nuance,
 					},
 				},
 				Spec: apiv1.PodSpec{
@@ -147,8 +146,9 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 		return
 	}
 	var instanceCount int32 = 2
+	timeNuance := strconv.Itoa(int(time.Now().Unix()))
 	imageName := getDockerImageName(service.DeployArtifact)
-	deployment := getK8sDeployment(instanceCount, service.ArtifactName, service.AvailableVersion, plan.Namespace.Name, imageName)
+	deployment := getK8sDeployment(instanceCount, service.ArtifactName, service.AvailableVersion, plan.Namespace.Name, imageName, timeNuance)
 	setupEnvironment(service.Metadata, deployment)
 	setupVaultInjection(vaultPaths, deployment)
 
@@ -175,7 +175,7 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 		}
 	}
 
-	labelSelector := fmt.Sprintf("app=%s,version=%s", service.ArtifactName, service.AvailableVersion)
+	labelSelector := fmt.Sprintf("app=%s,version=%s,nuance=%s", service.ArtifactName, service.AvailableVersion, timeNuance)
 	pods := k8s.CoreV1().Pods(plan.Namespace.Name)
 	watch, err := pods.Watch(ctx, metav1.ListOptions{
 		TypeMeta:       metav1.TypeMeta{},
