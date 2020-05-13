@@ -56,8 +56,7 @@ func getK8sDeployment(instanceCount int32, artifactName, artifactVersion, namesp
 			Replicas: int32Ptr(instanceCount),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"app":     artifactName,
-					"version": artifactVersion,
+					"app": artifactName,
 				},
 			},
 			Template: apiv1.PodTemplateSpec{
