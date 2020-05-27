@@ -35,6 +35,11 @@ docker-scanner-exec = docker run --rm \
 	--user="${DOCKER_UID}:${DOCKER_GID}" \
 	sonarsource/sonar-scanner-cli	
 
+docker-helm-exec = docker run --rm --user ${DOCKER_UID}:${DOCKER_UID} \
+	-v ${CUR_DIR}:/src \
+	-w /src \
+	alpine/helm
+
 docker-exec = docker run --rm \
 	-e DOCKER_UID=${DOCKER_UID} \
 	-e DOCKER_GID=${DOCKER_GID} \
@@ -44,6 +49,8 @@ docker-exec = docker run --rm \
 	-w /src \
 	${BUILD_IMAGE}
 
+
+
 .PHONY: build dist test
 
 build:
@@ -52,6 +59,8 @@ build:
 	mkdir -p bin
 	$(docker-exec) go build -o ./bin/eve-sch ./cmd/eve-sch/main.go
 	docker build . -t ${IMAGE_NAME}:${PATCH_VERSION}
+	$(docker-helm-exec) package --version ${PATCH_VERSION} --app-version ${VERSION} ./.helm
+
 
 test:
 	docker pull ${BUILD_IMAGE}
@@ -63,6 +72,8 @@ dist: build
 	curl --fail -H "X-JFrog-Art-Api:${JFROG_API_KEY}" \
 		-X PUT \
 		https://unanet.jfrog.io/unanet/api/storage/docker-local/eve-sch/${PATCH_VERSION}\?properties=version=${VERSION}%7Cgitlab-build-properties.project-id=${CI_PROJECT_ID}%7Cgitlab-build-properties.git-sha=${CI_COMMIT_SHORT_SHA}%7Cgitlab-build-properties.git-branch=${CI_COMMIT_BRANCH}
+	curl --fail -H "X-JFrog-Art-Api:${JFROG_API_KEY}" \
+		-T eve-sch-${PATCH_VERSION}.tgz "https://unanet.jfrog.io/artifactory/helm-local/eve-sch/eve-sch-${PATCH_VERSION}.tgz"
 
 deploy:
 	kubectl apply -f .kube/manifest.yaml

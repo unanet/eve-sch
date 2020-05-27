@@ -1,6 +1,4 @@
-eveVaultAddr: http://vault.vault:8200
 eveApiQUrl: https://sqs.us-east-2.amazonaws.com/580107804399/eve-api-prod.fifo
 eveSchQUrl: ""
 eveS3Bucket: "unanet-eve-queue"
 eveAWSRegion: "us-east-2"
-eveVaultRole: "eve-sch"

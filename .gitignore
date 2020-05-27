@@ -86,3 +86,4 @@ bin
 
 .scannerwork
 .sonar
+*.tgz

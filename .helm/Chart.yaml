@@ -1,0 +1,6 @@
+apiVersion: v2
+name: eve-sch
+description: EVE Scheduler
+type: application
+version: 0.32.0
+appVersion: 1.16.0

@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eve-sch-v1
+  namespace: eve-sch
+spec:
+  selector:
+    matchLabels:
+      app: eve-sch-v1
+  replicas: 2
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3001"
+      labels:
+        app: eve-sch-v1
+    spec:
+      serviceAccountName: eve-sch
+      securityContext:
+        runAsUser: 9001
+        runAsGroup: 9001
+        fsGroup: 65534
+      containers:
+        - name: eve-sch-v1
+          image: unanet-docker.jfrog.io/eve-sch:0.1.0
+          imagePullPolicy: Always
+          env:
+            - name: EVE_API_Q_URL
+              value: {{ .Values.eveApiQUrl }}
+            - name: EVE_SCH_Q_URL 
+              value: {{ .Values.eveSchQUrl }}
+            - name: EVE_S3_BUCKET 
+              value: {{ .Values.eveS3Bucket }}
+            - name: EVE_AWS_REGION 
+              value: {{ .Values.eveAWSRegion }}
+          ports:
+            - containerPort: 3001
+              name: metrics
+      imagePullSecrets:
+        - name: docker-cfg
