@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kelseyhightower/envconfig"
 	"gitlab.unanet.io/devops/eve/pkg/errors"
 	ehttp "gitlab.unanet.io/devops/eve/pkg/http"
 )
@@ -96,25 +97,30 @@ func TokenParserK8s(c *Client) TokenParser {
 }
 
 type Config struct {
-	VaultTimeout time.Duration `split_words:"true" default:"10s"`
-	VaultAddr    string        `split_words:"true" default:"http://localhost:8200"`
-	VaultRole    string        `split_words:"true" default:"vault-auth"`
+	Timeout time.Duration `split_words:"true" default:"10s"`
+	Addr    string        `split_words:"true" default:"http://localhost:8200"`
+	Role    string        `split_words:"true" default:"vault-auth"`
 }
 
-func NewClient(config Config, tokenAuthenticators ...TokenParser) (*Client, error) {
-	if strings.HasSuffix(config.VaultAddr, "/") {
-		config.VaultAddr = strings.TrimSuffix(config.VaultAddr, "/")
+func NewClient(tokenAuthenticators ...TokenParser) (*Client, error) {
+	var config Config
+	err := envconfig.Process("VAULT", &config)
+	if err != nil {
+		return nil, errors.Wrap(err)
+	}
+	if strings.HasSuffix(config.Addr, "/") {
+		config.Addr = strings.TrimSuffix(config.Addr, "/")
 	}
 
 	httpClient := &http.Client{
-		Timeout:   config.VaultTimeout,
+		Timeout:   config.Timeout,
 		Transport: ehttp.LoggingTransport,
 	}
 
 	client := &Client{
 		httpClient: httpClient,
-		vaultAddr:  config.VaultAddr,
-		vaultRole:  config.VaultRole,
+		vaultAddr:  config.Addr,
+		vaultRole:  config.Role,
 	}
 
 	if len(tokenAuthenticators) == 0 {

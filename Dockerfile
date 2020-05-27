@@ -2,6 +2,7 @@ FROM unanet-docker.jfrog.io/alpine-base
 
 ENV EVE_METRICS_PORT 3001
 ENV EVE_SERVICE_NAME eve-sch
+ENV VAULT_ROLE eve-sch
 
 ADD ./bin/eve-sch /app/eve-sch
 WORKDIR /app
