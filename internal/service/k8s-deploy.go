@@ -147,15 +147,15 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 	var instanceCount int32 = 2
 	timeNuance := strconv.Itoa(int(time.Now().Unix()))
 	imageName := getDockerImageName(service.DeployArtifact)
-	deployment := getK8sDeployment(instanceCount, service.ArtifactName, service.AvailableVersion, plan.K8sNamespace(), imageName, timeNuance)
+	deployment := getK8sDeployment(instanceCount, service.ArtifactName, service.AvailableVersion, plan.Namespace.Name, imageName, timeNuance)
 	setupEnvironment(service.Metadata, deployment)
 	setupVaultInjection(vaultPaths, deployment)
 
-	_, err = k8s.AppsV1().Deployments(plan.K8sNamespace()).Get(ctx, service.ArtifactName, metav1.GetOptions{})
+	_, err = k8s.AppsV1().Deployments(plan.Namespace.Name).Get(ctx, service.ArtifactName, metav1.GetOptions{})
 	if err != nil {
 		if k8sErrors.IsNotFound(err) {
 			// This app hasn't been deployed yet so we need to deploy it
-			_, err := k8s.AppsV1().Deployments(plan.K8sNamespace()).Create(ctx, deployment, metav1.CreateOptions{})
+			_, err := k8s.AppsV1().Deployments(plan.Namespace.Name).Create(ctx, deployment, metav1.CreateOptions{})
 			if err != nil {
 				fail(err, "an error occurred trying to create the deployment")
 				return
@@ -167,7 +167,7 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 		}
 	} else {
 		// we were able to retrieve the app which mean we need to run update instead of create
-		_, err := k8s.AppsV1().Deployments(plan.K8sNamespace()).Update(ctx, deployment, metav1.UpdateOptions{})
+		_, err := k8s.AppsV1().Deployments(plan.Namespace.Name).Update(ctx, deployment, metav1.UpdateOptions{})
 		if err != nil {
 			fail(err, "an error occurred trying to update the deployment")
 			return
@@ -175,7 +175,7 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 	}
 
 	labelSelector := fmt.Sprintf("app=%s,version=%s,nuance=%s", service.ArtifactName, service.AvailableVersion, timeNuance)
-	pods := k8s.CoreV1().Pods(plan.K8sNamespace())
+	pods := k8s.CoreV1().Pods(plan.Namespace.Name)
 	watch, err := pods.Watch(ctx, metav1.ListOptions{
 		TypeMeta:       metav1.TypeMeta{},
 		LabelSelector:  labelSelector,
@@ -206,7 +206,7 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 
 	if len(started) != int(instanceCount) {
 		// make sure we don't get a false positive and actually check
-		pods, err := k8s.CoreV1().Pods(plan.K8sNamespace()).List(ctx, metav1.ListOptions{
+		pods, err := k8s.CoreV1().Pods(plan.Namespace.Name).List(ctx, metav1.ListOptions{
 			LabelSelector: labelSelector,
 		})
 		if err != nil {
