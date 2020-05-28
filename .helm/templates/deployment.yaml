@@ -23,7 +23,7 @@ spec:
         fsGroup: 65534
       containers:
         - name: eve-sch-v1
-          image: unanet-docker.jfrog.io/eve-sch:0.1.0
+          image: unanet-docker.jfrog.io/ops/eve-sch:0.1.0
           imagePullPolicy: Always
           env:
             - name: EVE_API_Q_URL
