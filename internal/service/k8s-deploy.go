@@ -167,7 +167,7 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 	var instanceCount = 2
 	timeNuance := strconv.Itoa(int(time.Now().Unix()))
 	imageName := getDockerImageName(service.DeployArtifact)
-	deployment := getK8sDeployment(instanceCount, service.ServicePort, service.ArtifactName, service.AvailableVersion, plan.Namespace.Name, imageName, timeNuance)
+	deployment := getK8sDeployment(instanceCount, service.ServiceAccount, service.ArtifactName, service.AvailableVersion, plan.Namespace.Name, imageName, timeNuance)
 	setupEnvironment(service.Metadata, deployment)
 	setupMetrics(service.MetricsPort, deployment)
 	setupPorts(service.ServicePort, service.MetricsPort, deployment)
