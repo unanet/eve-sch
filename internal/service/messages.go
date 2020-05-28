@@ -29,31 +29,29 @@ func (s *Scheduler) deployNamespace(ctx context.Context, m *queue.M) error {
 	}
 
 	for _, x := range plan.Services {
-		var vaultPaths []string
-		x.Metadata, vaultPaths, err = ParseServiceMetadata(x.Metadata, x, plan)
+		x.Metadata, err = ParseServiceMetadata(x.Metadata, x, plan)
 		if err != nil {
 			plan.Message("could not parse metadata, service: %s, error: %s", x.ArtifactName, err)
 		}
 		if x.ArtifactoryFeedType == eve.ArtifactoryFeedTypeDocker {
-			s.deployDockerService(ctx, x, plan, vaultPaths)
+			s.deployDockerService(ctx, x, plan)
 		}
 		if len(x.ArtifactFnPtr) > 0 {
-			s.triggerFunction(ctx, x.DeployArtifact, plan, vaultPaths)
+			s.triggerFunction(ctx, x.DeployArtifact, plan)
 		}
 	}
 
 	for _, x := range plan.Migrations {
-		var vaultPaths []string
-		x.Metadata, vaultPaths, err = ParseMigrationMetadata(x.Metadata, x, plan)
+		x.Metadata, err = ParseMigrationMetadata(x.Metadata, x, plan)
 		if err != nil {
 			plan.Message("could not parse metadata, migration: %s, error: %s", x.ArtifactName, err)
 		}
 
 		if x.ArtifactoryFeedType == eve.ArtifactoryFeedTypeDocker {
-			s.runDockerMigrationJob(ctx, x, plan, vaultPaths)
+			s.runDockerMigrationJob(ctx, x, plan)
 		}
 		if len(x.ArtifactFnPtr) > 0 {
-			s.triggerFunction(ctx, x.DeployArtifact, plan, vaultPaths)
+			s.triggerFunction(ctx, x.DeployArtifact, plan)
 		}
 	}
 

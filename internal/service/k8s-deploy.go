@@ -20,10 +20,26 @@ import (
 )
 
 const (
-	DockerRepoFormat = "unanet-%s.jfrog.io"
+	DockerRepoFormat  = "unanet-%s.jfrog.io"
+	K8sServiceAccount = "unanet"
 )
 
-func int32Ptr(i int32) *int32 { return &i }
+// apiVersion: v1
+// kind: Service
+// metadata:
+//   name: ${SERVICE}
+//   namespace: ${NAMESPACE}
+// spec:
+//   ports:
+//     - port: 80
+//       targetPort: 80
+//   selector:
+//     app: ${SERVICE}
+
+func int32Ptr(i int) *int32 {
+	i32 := int32(i)
+	return &i32
+}
 
 func int64Ptr(i int64) *int64 { return &i }
 
@@ -46,7 +62,7 @@ func getK8sClient() (*kubernetes.Clientset, error) {
 	return client, nil
 }
 
-func getK8sDeployment(instanceCount int32, artifactName, artifactVersion, namespace, containerImage, nuance string) *appsv1.Deployment {
+func getK8sDeployment(instanceCount int, serviceAccountName, artifactName, artifactVersion, namespace, containerImage, nuance string) *appsv1.Deployment {
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      artifactName,
@@ -68,19 +84,18 @@ func getK8sDeployment(instanceCount int32, artifactName, artifactVersion, namesp
 					},
 				},
 				Spec: apiv1.PodSpec{
-					ServiceAccountName: "unanet",
+					SecurityContext: &apiv1.PodSecurityContext{
+						RunAsUser:  int64Ptr(1101),
+						RunAsGroup: int64Ptr(1101),
+						FSGroup:    int64Ptr(65534),
+					},
+					ServiceAccountName: serviceAccountName,
 					Containers: []apiv1.Container{
 						{
 							Name:            artifactName,
 							ImagePullPolicy: apiv1.PullAlways,
 							Image:           containerImage,
-							Ports: []apiv1.ContainerPort{
-								{
-									Name:          "http",
-									Protocol:      apiv1.ProtocolTCP,
-									ContainerPort: 80,
-								},
-							},
+							Ports:           []apiv1.ContainerPort{},
 						},
 					},
 					ImagePullSecrets: []apiv1.LocalObjectReference{
@@ -111,45 +126,51 @@ func setupEnvironment(metadata map[string]interface{}, deployment *appsv1.Deploy
 	deployment.Spec.Template.Spec.Containers[0].Env = containerEnvVars
 }
 
-func setupVaultInjection(paths []string, deployment *appsv1.Deployment) {
-	if len(paths) == 0 {
+func setupPorts(servicePort, metricsPort int, deployment *appsv1.Deployment) {
+	if servicePort != 0 {
+		deployment.Spec.Template.Spec.Containers[0].Ports = append(deployment.Spec.Template.Spec.Containers[0].Ports, apiv1.ContainerPort{
+			Name:          "http",
+			ContainerPort: int32(servicePort),
+			Protocol:      apiv1.ProtocolTCP,
+		})
+	}
+
+	if metricsPort != 0 {
+		deployment.Spec.Template.Spec.Containers[0].Ports = append(deployment.Spec.Template.Spec.Containers[0].Ports, apiv1.ContainerPort{
+			Name:          "metrics",
+			ContainerPort: int32(metricsPort),
+			Protocol:      apiv1.ProtocolTCP,
+		})
+	}
+}
+
+func setupMetrics(port int, deployment *appsv1.Deployment) {
+	if port == 0 {
 		return
 	}
 
 	annotations := map[string]string{
-		"vault.hashicorp.com/agent-inject":            "true",
-		"vault.hashicorp.com/agent-pre-populate-only": "true",
-		"vault.hashicorp.com/role":                    "eve-sch",
+		"prometheus.io/scrape": "true",
+		"prometheus.io/port":   strconv.Itoa(port),
 	}
 
-	for _, x := range paths {
-		annotationPath := strings.ReplaceAll(x, "/", "-")
-		annotations[fmt.Sprintf("vault.hashicorp.com/agent-inject-secret-%s", annotationPath)] = fmt.Sprintf("kv/data/%s", x)
-		annotations[fmt.Sprintf("vault.hashicorp.com/agent-inject-template-%s", annotationPath)] = fmt.Sprintf(`
-{{- with secret "kv/data/%s" -}}
-{{ range $k, $v := .Data.data }}
-export {{ $k | toUpper }}={{ $v }}
-{{ end }}
-{{- end }}
-`, x)
-	}
-	// inject vault variables
 	deployment.Spec.Template.ObjectMeta.Annotations = annotations
 }
 
-func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.DeployService, plan *eve.NSDeploymentPlan, vaultPaths []string) {
+func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.DeployService, plan *eve.NSDeploymentPlan) {
 	fail := s.failAndLogFn(ctx, service.DeployArtifact, plan)
 	k8s, err := getK8sClient()
 	if err != nil {
 		fail(err, "an error occurred trying to get the k8s client")
 		return
 	}
-	var instanceCount int32 = 2
+	var instanceCount = 2
 	timeNuance := strconv.Itoa(int(time.Now().Unix()))
 	imageName := getDockerImageName(service.DeployArtifact)
-	deployment := getK8sDeployment(instanceCount, service.ArtifactName, service.AvailableVersion, plan.Namespace.Name, imageName, timeNuance)
+	deployment := getK8sDeployment(instanceCount, service.ServicePort, service.ArtifactName, service.AvailableVersion, plan.Namespace.Name, imageName, timeNuance)
 	setupEnvironment(service.Metadata, deployment)
-	setupVaultInjection(vaultPaths, deployment)
+	setupMetrics(service.MetricsPort, deployment)
+	setupPorts(service.ServicePort, service.MetricsPort, deployment)
 
 	_, err = k8s.AppsV1().Deployments(plan.Namespace.Name).Get(ctx, service.ArtifactName, metav1.GetOptions{})
 	if err != nil {
@@ -199,12 +220,12 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 			started[p.Name] = true
 		}
 
-		if len(started) == int(instanceCount) {
+		if len(started) == instanceCount {
 			watch.Stop()
 		}
 	}
 
-	if len(started) != int(instanceCount) {
+	if len(started) != instanceCount {
 		// make sure we don't get a false positive and actually check
 		pods, err := k8s.CoreV1().Pods(plan.Namespace.Name).List(ctx, metav1.ListOptions{
 			LabelSelector: labelSelector,
@@ -214,7 +235,7 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 			return
 		}
 
-		if len(pods.Items) != int(instanceCount) {
+		if len(pods.Items) != instanceCount {
 			fail(nil, "an error occurred while trying to deploy: %s, timed out waiting for app to start.", service.ArtifactName)
 			return
 		}
@@ -226,7 +247,7 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 			}
 		}
 
-		if startedCount != int(instanceCount) {
+		if startedCount != instanceCount {
 			fail(nil, "an error occurred while trying to deploy: %s, timed out waiting for app to start.", service.ArtifactName)
 			return
 		}
@@ -235,6 +256,6 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 	service.Result = eve.DeployArtifactResultSuccess
 }
 
-func (s *Scheduler) runDockerMigrationJob(ctx context.Context, migration *eve.DeployMigration, plan *eve.NSDeploymentPlan, vaultPaths []string) {
+func (s *Scheduler) runDockerMigrationJob(ctx context.Context, migration *eve.DeployMigration, plan *eve.NSDeploymentPlan) {
 
 }

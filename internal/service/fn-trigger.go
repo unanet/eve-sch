@@ -2,11 +2,14 @@ package service
 
 import (
 	"context"
+	"strings"
 
 	"gitlab.unanet.io/devops/eve/pkg/eve"
 	"go.uber.org/zap"
+)
 
-	"gitlab.unanet.io/devops/eve-sch/internal/vault"
+const (
+	VaultEnvPrefix = "vault:"
 )
 
 func (s *Scheduler) getFunctionCode(ctx context.Context, function string) string {
@@ -24,34 +27,40 @@ func (s *Scheduler) getFunctionCode(ctx context.Context, function string) string
 	return "empty"
 }
 
-func (s *Scheduler) getSecrets(ctx context.Context, paths []string) vault.Secrets {
-	var secrets vault.Secrets = make(map[string]string)
-	for _, x := range paths {
-		ps, err := s.vault.GetKVSecrets(ctx, x)
-		if err != nil {
-			s.Logger(ctx).Error("failed to load secrets", zap.String("path", x), zap.Error(err))
+func (s *Scheduler) setSecrets(ctx context.Context, metadata map[string]interface{}) {
+	for k, v := range metadata {
+		ms, ok := v.(string)
+		if !ok {
 			continue
 		}
-		for k, v := range ps {
-			secrets[k] = v
+		if !strings.HasPrefix(ms, VaultEnvPrefix) {
+			continue
 		}
-	}
 
-	return secrets
+		ms = strings.TrimPrefix(ms, VaultEnvPrefix)
+		valueSplit := strings.Split(ms, "#")
+		if len(valueSplit) != 2 {
+			s.Logger(ctx).Error("invalid vault env reference", zap.String("key", k), zap.String("value", ms))
+			continue
+		}
+
+		ps, err := s.vault.GetKVSecretString(ctx, valueSplit[0], valueSplit[1])
+		if err != nil {
+			s.Logger(ctx).Error("failed to load secrets", zap.Error(err))
+			continue
+		}
+
+		metadata[k] = ps
+	}
 }
 
-func (s *Scheduler) triggerFunction(ctx context.Context, service *eve.DeployArtifact, plan *eve.NSDeploymentPlan, vaultPaths []string) {
+func (s *Scheduler) triggerFunction(ctx context.Context, service *eve.DeployArtifact, plan *eve.NSDeploymentPlan) {
 	fail := s.failAndLogFn(ctx, service, plan)
-	secrets := s.getSecrets(ctx, vaultPaths)
 	payload := make(map[string]interface{})
 	for k, v := range service.Metadata {
 		payload[k] = v
 	}
-
-	for k, v := range secrets {
-		payload[k] = v
-	}
-
+	s.setSecrets(ctx, payload)
 	fnCode := s.getFunctionCode(ctx, service.ArtifactFnPtr)
 
 	resp, err := s.fnTrigger.Post(ctx, service.ArtifactFnPtr, fnCode, payload)

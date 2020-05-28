@@ -18,8 +18,8 @@ spec:
     spec:
       serviceAccountName: eve-sch
       securityContext:
-        runAsUser: 9001
-        runAsGroup: 9001
+        runAsUser: 1101
+        runAsGroup: 1101
         fsGroup: 65534
       containers:
         - name: eve-sch-v1
