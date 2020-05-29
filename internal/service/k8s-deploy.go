@@ -45,7 +45,7 @@ func int64Ptr(i int64) *int64 { return &i }
 
 func getDockerImageName(artifact *eve.DeployArtifact) string {
 	repo := fmt.Sprintf(DockerRepoFormat, artifact.ArtifactoryFeed)
-	return fmt.Sprintf("%s/%s:%s", repo, artifact.ArtifactoryPath, artifact.AvailableVersion)
+	return fmt.Sprintf("%s/%s:%s", repo, artifact.ArtifactoryPath, artifact.EvalImageTag())
 }
 
 func getK8sClient() (*kubernetes.Clientset, error) {
@@ -207,6 +207,10 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 		return
 	}
 	started := make(map[string]bool)
+
+	if service.ArtifactName == "eve-sch" {
+		instanceCount = 1
+	}
 
 	for event := range watch.ResultChan() {
 		p, ok := event.Object.(*apiv1.Pod)
