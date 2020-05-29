@@ -62,23 +62,31 @@ func getK8sClient() (*kubernetes.Clientset, error) {
 	return client, nil
 }
 
-func getK8sDeployment(instanceCount int, serviceAccountName, artifactName, artifactVersion, namespace, containerImage, nuance string) *appsv1.Deployment {
+func getK8sDeployment(
+	instanceCount int,
+	serviceAccountName,
+	serviceName,
+	artifactName,
+	artifactVersion,
+	namespace,
+	containerImage,
+	nuance string) *appsv1.Deployment {
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      artifactName,
+			Name:      serviceName,
 			Namespace: namespace,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: int32Ptr(instanceCount),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"app": artifactName,
+					"app": serviceName,
 				},
 			},
 			Template: apiv1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app":     artifactName,
+						"app":     serviceName,
 						"version": artifactVersion,
 						"nuance":  nuance,
 					},
@@ -167,12 +175,20 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 	var instanceCount = 2
 	timeNuance := strconv.Itoa(int(time.Now().Unix()))
 	imageName := getDockerImageName(service.DeployArtifact)
-	deployment := getK8sDeployment(instanceCount, service.ServiceAccount, service.ArtifactName, service.AvailableVersion, plan.Namespace.Name, imageName, timeNuance)
+	deployment := getK8sDeployment(
+		instanceCount,
+		service.ServiceAccount,
+		service.ServiceName,
+		service.ArtifactName,
+		service.AvailableVersion,
+		plan.Namespace.Name,
+		imageName,
+		timeNuance)
 	setupEnvironment(service.Metadata, deployment)
 	setupMetrics(service.MetricsPort, deployment)
 	setupPorts(service.ServicePort, service.MetricsPort, deployment)
 
-	_, err = k8s.AppsV1().Deployments(plan.Namespace.Name).Get(ctx, service.ArtifactName, metav1.GetOptions{})
+	_, err = k8s.AppsV1().Deployments(plan.Namespace.Name).Get(ctx, service.ServiceName, metav1.GetOptions{})
 	if err != nil {
 		if k8sErrors.IsNotFound(err) {
 			// This app hasn't been deployed yet so we need to deploy it
@@ -195,7 +211,7 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 		}
 	}
 
-	labelSelector := fmt.Sprintf("app=%s,version=%s,nuance=%s", service.ArtifactName, service.AvailableVersion, timeNuance)
+	labelSelector := fmt.Sprintf("app=%s,version=%s,nuance=%s", service.ServiceName, service.AvailableVersion, timeNuance)
 	pods := k8s.CoreV1().Pods(plan.Namespace.Name)
 	watch, err := pods.Watch(ctx, metav1.ListOptions{
 		TypeMeta:       metav1.TypeMeta{},
@@ -208,7 +224,7 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 	}
 	started := make(map[string]bool)
 
-	if strings.HasPrefix(service.ArtifactName, "eve-sch") {
+	if strings.HasPrefix(service.ServiceName, "eve-sch") {
 		instanceCount = 1
 	}
 
@@ -235,12 +251,12 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 			LabelSelector: labelSelector,
 		})
 		if err != nil {
-			fail(nil, "an error occurred while trying to deploy: %s, timed out waiting for app to start.", service.ArtifactName)
+			fail(nil, "an error occurred while trying to deploy: %s, timed out waiting for app to start.", service.ServiceName)
 			return
 		}
 
 		if len(pods.Items) != instanceCount {
-			fail(nil, "an error occurred while trying to deploy: %s, timed out waiting for app to start.", service.ArtifactName)
+			fail(nil, "an error occurred while trying to deploy: %s, timed out waiting for app to start.", service.ServiceName)
 			return
 		}
 
@@ -252,7 +268,7 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 		}
 
 		if startedCount != instanceCount {
-			fail(nil, "an error occurred while trying to deploy: %s, timed out waiting for app to start.", service.ArtifactName)
+			fail(nil, "an error occurred while trying to deploy: %s, timed out waiting for app to start.", service.ServiceName)
 			return
 		}
 	}
