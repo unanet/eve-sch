@@ -32,7 +32,6 @@ type Config struct {
 	S3Bucket               string        `split_words:"true" required:"true"`
 	AWSRegion              string        `split_words:"true" required:"true"`
 	MetricsPort            int           `split_words:"true" default:"3001"`
-	ClusterName            string        `split_words:"true" required:"true"`
 }
 
 func GetConfig() Config {
