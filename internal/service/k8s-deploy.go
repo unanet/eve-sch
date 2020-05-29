@@ -208,7 +208,7 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 	}
 	started := make(map[string]bool)
 
-	if service.ArtifactName == "eve-sch" {
+	if strings.HasPrefix(service.ArtifactName, "eve-sch") {
 		instanceCount = 1
 	}
 
