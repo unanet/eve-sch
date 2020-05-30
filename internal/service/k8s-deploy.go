@@ -202,17 +202,17 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 	if service.ServicePort > 0 {
 		_, err := k8s.CoreV1().Services(plan.Namespace.Name).Get(ctx, service.ServiceName, metav1.GetOptions{})
 		if err != nil {
-			// if k8sErrors.IsNotFound(err) {
-			_, err := k8s.CoreV1().Services(plan.Namespace.Name).Create(ctx,
-				getK8sService(service.ServiceName, plan.Namespace.Name, service.ServicePort), metav1.CreateOptions{})
-			if err != nil {
-				fail(err, "an error occurred trying to create the service")
+			if k8sErrors.IsNotFound(err) {
+				_, err := k8s.CoreV1().Services(plan.Namespace.Name).Create(ctx,
+					getK8sService(service.ServiceName, plan.Namespace.Name, service.ServicePort), metav1.CreateOptions{})
+				if err != nil {
+					fail(err, "an error occurred trying to create the service")
+					return
+				}
+			} else {
+				fail(err, "an error occurred trying to check for the service")
 				return
 			}
-			// } else {
-			// 	fail(err, "an error occurred trying to check for the service")
-			// 	return
-			// }
 		}
 	}
 
