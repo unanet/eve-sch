@@ -13,6 +13,7 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
@@ -20,21 +21,8 @@ import (
 )
 
 const (
-	DockerRepoFormat  = "unanet-%s.jfrog.io"
-	K8sServiceAccount = "unanet"
+	DockerRepoFormat = "unanet-%s.jfrog.io"
 )
-
-// apiVersion: v1
-// kind: Service
-// metadata:
-//   name: ${SERVICE}
-//   namespace: ${NAMESPACE}
-// spec:
-//   ports:
-//     - port: 80
-//       targetPort: 80
-//   selector:
-//     app: ${SERVICE}
 
 func int32Ptr(i int) *int32 {
 	i32 := int32(i)
@@ -60,6 +48,29 @@ func getK8sClient() (*kubernetes.Clientset, error) {
 	}
 
 	return client, nil
+}
+
+func getK8sService(serviceName, namespace string, servicePort int) *apiv1.Service {
+	return &apiv1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      serviceName,
+			Namespace: namespace,
+		},
+		Spec: apiv1.ServiceSpec{
+			Ports: []apiv1.ServicePort{
+				{
+					Port: int32(servicePort),
+					TargetPort: intstr.IntOrString{
+						Type:   intstr.Int,
+						IntVal: int32(servicePort),
+					},
+				},
+			},
+			Selector: map[string]string{
+				"app": serviceName,
+			},
+		},
+	}
 }
 
 func getK8sDeployment(
@@ -187,6 +198,23 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 	setupEnvironment(service.Metadata, deployment)
 	setupMetrics(service.MetricsPort, deployment)
 	setupPorts(service.ServicePort, service.MetricsPort, deployment)
+
+	if service.ServicePort > 0 {
+		_, err := k8s.CoreV1().Services(plan.Namespace.Name).Get(ctx, service.ServiceName, metav1.GetOptions{})
+		if err != nil {
+			if k8sErrors.IsNotFound(err) {
+				_, err := k8s.CoreV1().Services(plan.Namespace.Name).Create(ctx,
+					getK8sService(service.ServiceName, plan.Namespace.Name, service.ServicePort), metav1.CreateOptions{})
+				if err != nil {
+					fail(err, "an error occurred trying to create the service")
+					return
+				}
+			} else {
+				fail(err, "an error occurred trying to check for the service")
+				return
+			}
+		}
+	}
 
 	_, err = k8s.AppsV1().Deployments(plan.Namespace.Name).Get(ctx, service.ServiceName, metav1.GetOptions{})
 	if err != nil {
