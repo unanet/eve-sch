@@ -74,7 +74,7 @@ func getK8sService(serviceName, namespace string, servicePort int) *apiv1.Servic
 }
 
 func getK8sDeployment(
-	instanceCount int,
+	instanceCount, runAs int,
 	serviceAccountName,
 	serviceName,
 	artifactName,
@@ -104,8 +104,8 @@ func getK8sDeployment(
 				},
 				Spec: apiv1.PodSpec{
 					SecurityContext: &apiv1.PodSecurityContext{
-						RunAsUser:  int64Ptr(1101),
-						RunAsGroup: int64Ptr(1101),
+						RunAsUser:  int64Ptr(int64(runAs)),
+						RunAsGroup: int64Ptr(int64(runAs)),
 						FSGroup:    int64Ptr(65534),
 					},
 					ServiceAccountName: serviceAccountName,
@@ -187,7 +187,7 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 	timeNuance := strconv.Itoa(int(time.Now().Unix()))
 	imageName := getDockerImageName(service.DeployArtifact)
 	deployment := getK8sDeployment(
-		instanceCount,
+		instanceCount, service.RunAs,
 		service.ServiceAccount,
 		service.ServiceName,
 		service.ArtifactName,
