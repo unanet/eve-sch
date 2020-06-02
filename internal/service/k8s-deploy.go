@@ -50,8 +50,8 @@ func getK8sClient() (*kubernetes.Clientset, error) {
 	return client, nil
 }
 
-func getK8sService(serviceName, namespace string, servicePort int) *apiv1.Service {
-	return &apiv1.Service{
+func setupK8sService(serviceName, namespace string, servicePort int, stickySessions bool) *apiv1.Service {
+	service := &apiv1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
 			Namespace: namespace,
@@ -71,6 +71,12 @@ func getK8sService(serviceName, namespace string, servicePort int) *apiv1.Servic
 			},
 		},
 	}
+
+	if stickySessions {
+		service.Spec.SessionAffinity = apiv1.ServiceAffinityClientIP
+	}
+
+	return service
 }
 
 func getK8sDeployment(
@@ -183,7 +189,7 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 		fail(err, "an error occurred trying to get the k8s client")
 		return
 	}
-	var instanceCount = 2
+	var instanceCount = service.Count
 	timeNuance := strconv.Itoa(int(time.Now().Unix()))
 	imageName := getDockerImageName(service.DeployArtifact)
 	deployment := getK8sDeployment(
@@ -204,7 +210,7 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 		if err != nil {
 			if k8sErrors.IsNotFound(err) {
 				_, err := k8s.CoreV1().Services(plan.Namespace.Name).Create(ctx,
-					getK8sService(service.ServiceName, plan.Namespace.Name, service.ServicePort), metav1.CreateOptions{})
+					setupK8sService(service.ServiceName, plan.Namespace.Name, service.ServicePort, service.StickySessions), metav1.CreateOptions{})
 				if err != nil {
 					fail(err, "an error occurred trying to create the service")
 					return
@@ -302,8 +308,4 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 	}
 
 	service.Result = eve.DeployArtifactResultSuccess
-}
-
-func (s *Scheduler) runDockerMigrationJob(ctx context.Context, migration *eve.DeployMigration, plan *eve.NSDeploymentPlan) {
-
 }
