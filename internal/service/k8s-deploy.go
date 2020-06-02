@@ -143,7 +143,7 @@ func setupEnvironment(metadata map[string]interface{}, deployment *appsv1.Deploy
 			continue
 		}
 		containerEnvVars = append(containerEnvVars, apiv1.EnvVar{
-			Name:  strings.ToUpper(k),
+			Name:  k,
 			Value: value,
 		})
 	}
