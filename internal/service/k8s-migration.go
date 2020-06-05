@@ -116,11 +116,6 @@ func getK8sMigrationJob(
 			Namespace: namespace,
 		},
 		Spec: batchv1.JobSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					"job": jobName,
-				},
-			},
 			Template: apiv1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
