@@ -47,7 +47,7 @@ func (s *Scheduler) runDockerMigrationJob(ctx context.Context, migration *eve.De
 		migration.ServiceAccount,
 		migration.ArtifactName,
 		imageName,
-		migration.RequestedVersion,
+		migration.AvailableVersion,
 		migration.RunAs)
 	setupJobEnvironment(migration.Metadata, job)
 
