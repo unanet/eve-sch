@@ -7,7 +7,6 @@ import (
 	"gitlab.unanet.io/devops/eve/pkg/eve"
 	batchv1 "k8s.io/api/batch/v1"
 	apiv1 "k8s.io/api/core/v1"
-	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"gitlab.unanet.io/devops/eve-sch/internal/config"
@@ -49,17 +48,16 @@ func (s *Scheduler) runDockerMigrationJob(ctx context.Context, migration *eve.De
 		migration.RunAs)
 	setupJobEnvironment(migration.Metadata, job)
 
-	_, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Get(ctx, jobName, metav1.GetOptions{})
+	_ = k8s.BatchV1().Jobs(plan.Namespace.Name).Delete(ctx, jobName, metav1.DeleteOptions{})
+
+	existingPods, err := k8s.CoreV1().Pods(plan.Namespace.Name).List(ctx, metav1.ListOptions{
+		TypeMeta:      metav1.TypeMeta{},
+		LabelSelector: fmt.Sprintf("job=%s", jobName),
+	})
+
 	if err == nil {
-		err = k8s.BatchV1().Jobs(plan.Namespace.Name).Delete(ctx, jobName, metav1.DeleteOptions{})
-		if err != nil {
-			fail(err, "an error occurred trying to delete the old migration job")
-			return
-		}
-	} else {
-		if !k8sErrors.IsNotFound(err) {
-			fail(err, "an error occurred trying to check for old migration jobs")
-			return
+		for _, x := range existingPods.Items {
+			_ = k8s.CoreV1().Pods(plan.Namespace.Name).Delete(ctx, x.Name, metav1.DeleteOptions{})
 		}
 	}
 
