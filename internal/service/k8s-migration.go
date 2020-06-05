@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"gitlab.unanet.io/devops/eve/pkg/eve"
 	batchv1 "k8s.io/api/batch/v1"
@@ -31,12 +32,14 @@ func setupJobEnvironment(metadata map[string]interface{}, job *batchv1.Job) {
 
 func (s *Scheduler) runDockerMigrationJob(ctx context.Context, migration *eve.DeployMigration, plan *eve.NSDeploymentPlan) {
 	fail := s.failAndLogFn(ctx, migration.DatabaseName, migration.DeployArtifact, plan)
+
 	k8s, err := getK8sClient()
 	if err != nil {
 		fail(err, "an error occurred trying to get the k8s client")
 		return
 	}
 	jobName := fmt.Sprintf("%s-migration", migration.DatabaseName)
+	labelSelector := fmt.Sprintf("job=%s", jobName)
 	imageName := getDockerImageName(migration.DeployArtifact)
 	job := getK8sMigrationJob(
 		jobName,
@@ -52,12 +55,27 @@ func (s *Scheduler) runDockerMigrationJob(ctx context.Context, migration *eve.De
 
 	existingPods, err := k8s.CoreV1().Pods(plan.Namespace.Name).List(ctx, metav1.ListOptions{
 		TypeMeta:      metav1.TypeMeta{},
-		LabelSelector: fmt.Sprintf("job=%s", jobName),
+		LabelSelector: labelSelector,
 	})
 
 	if err == nil {
 		for _, x := range existingPods.Items {
 			_ = k8s.CoreV1().Pods(plan.Namespace.Name).Delete(ctx, x.Name, metav1.DeleteOptions{})
+		}
+	}
+
+	for i := 1; i < 60; i++ {
+		time.Sleep(1 * time.Second)
+		existingPods, err := k8s.CoreV1().Pods(plan.Namespace.Name).List(ctx, metav1.ListOptions{
+			TypeMeta:      metav1.TypeMeta{},
+			LabelSelector: fmt.Sprintf("job=%s", jobName),
+		})
+		if err != nil {
+			fail(err, "an error occurred trying to wait for old migration jobs to be removed")
+			return
+		}
+		if len(existingPods.Items) == 0 {
+			break
 		}
 	}
 
@@ -67,7 +85,6 @@ func (s *Scheduler) runDockerMigrationJob(ctx context.Context, migration *eve.De
 		return
 	}
 
-	labelSelector := fmt.Sprintf("job=%s,version=%s", jobName, migration.AvailableVersion)
 	watchPods := k8s.CoreV1().Pods(plan.Namespace.Name)
 	watch, err := watchPods.Watch(ctx, metav1.ListOptions{
 		TypeMeta:       metav1.TypeMeta{},

@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -47,15 +46,17 @@ func GetK8sClient(t *testing.T) *kubernetes.Clientset {
 func TestScheduler_deployNamespace(t *testing.T) {
 	k8s := GetK8sClient(t)
 	ctx := context.TODO()
-	secret, err := k8s.CoreV1().Secrets("una-int-prev-1").Get(ctx, "docker-cfg", metav1.GetOptions{})
-	require.NoError(t, err)
-	fmt.Println(secret)
 
-	_, err = k8s.CoreV1().Namespaces().Get(ctx, "una-int-prev-5", metav1.GetOptions{})
-	if k8sErrors.IsNotFound(err) {
-		fmt.Println("blah")
-	} else {
-		fmt.Println("##################################")
+	labelSelector := fmt.Sprintf("job=%s", "unaneta-migration")
+	// make sure we don't get a false positive and actually check
+	pods, err := k8s.CoreV1().Pods("una-int-current").List(ctx, metav1.ListOptions{
+		LabelSelector: labelSelector,
+	})
+	require.NoError(t, err)
+	require.True(t, len(pods.Items) > 0)
+	for _, x := range pods.Items {
+		require.NotNil(t, x.Status.ContainerStatuses[0].State.Terminated)
+		fmt.Println(x.Status.ContainerStatuses[0].State.Terminated)
 	}
 
 }
