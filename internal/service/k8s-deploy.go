@@ -7,15 +7,12 @@ import (
 	"strings"
 	"time"
 
-	"gitlab.unanet.io/devops/eve/pkg/errors"
 	"gitlab.unanet.io/devops/eve/pkg/eve"
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 
 	"gitlab.unanet.io/devops/eve-sch/internal/config"
 )
@@ -30,25 +27,6 @@ func int32Ptr(i int) *int32 {
 }
 
 func int64Ptr(i int64) *int64 { return &i }
-
-func getDockerImageName(artifact *eve.DeployArtifact) string {
-	repo := fmt.Sprintf(DockerRepoFormat, artifact.ArtifactoryFeed)
-	return fmt.Sprintf("%s/%s:%s", repo, artifact.ArtifactoryPath, artifact.EvalImageTag())
-}
-
-func getK8sClient() (*kubernetes.Clientset, error) {
-	c, err := rest.InClusterConfig()
-	if err != nil {
-		return nil, errors.Wrap(err)
-	}
-
-	client, err := kubernetes.NewForConfig(c)
-	if err != nil {
-		return nil, errors.Wrap(err)
-	}
-
-	return client, nil
-}
 
 func setupK8sService(serviceName, namespace string, servicePort int, stickySessions bool) *apiv1.Service {
 	service := &apiv1.Service{
@@ -134,7 +112,7 @@ func getK8sDeployment(
 	}
 }
 
-func setupEnvironment(metadata map[string]interface{}, deployment *appsv1.Deployment) {
+func setupDeploymentEnvironment(metadata map[string]interface{}, deployment *appsv1.Deployment) {
 	var containerEnvVars []apiv1.EnvVar
 
 	for k, v := range metadata {
@@ -201,7 +179,7 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 		plan.Namespace.Name,
 		imageName,
 		timeNuance)
-	setupEnvironment(service.Metadata, deployment)
+	setupDeploymentEnvironment(service.Metadata, deployment)
 	setupMetrics(service.MetricsPort, deployment)
 	setupPorts(service.ServicePort, service.MetricsPort, deployment)
 

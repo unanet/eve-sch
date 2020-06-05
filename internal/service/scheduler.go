@@ -9,11 +9,14 @@ import (
 	"syscall"
 	"time"
 
+	"gitlab.unanet.io/devops/eve/pkg/errors"
 	"gitlab.unanet.io/devops/eve/pkg/eve"
 	"gitlab.unanet.io/devops/eve/pkg/log"
 	"gitlab.unanet.io/devops/eve/pkg/metrics"
 	"gitlab.unanet.io/devops/eve/pkg/queue"
 	"go.uber.org/zap"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 
 	"gitlab.unanet.io/devops/eve-sch/internal/config"
 	"gitlab.unanet.io/devops/eve-sch/internal/fn"
@@ -66,20 +69,6 @@ func NewScheduler(worker QueueWorker, downloader eve.CloudDownloader, uploader e
 	}
 }
 
-func (s *Scheduler) failAndLogFn(ctx context.Context, service *eve.DeployArtifact, plan *eve.NSDeploymentPlan) func(err error, format string, a ...interface{}) {
-	return func(err error, format string, a ...interface{}) {
-		format = format + " [service:%s]"
-		a = append(a, service.ArtifactName)
-		plan.Message(format, a...)
-		service.Result = eve.DeployArtifactResultFailed
-		if err == nil {
-			s.Logger(ctx).Error(fmt.Sprintf(format, a...), zap.String("service", service.ArtifactName))
-		} else {
-			s.Logger(ctx).Error(fmt.Sprintf(format, a...), zap.String("service", service.ArtifactName), zap.Error(err))
-		}
-	}
-}
-
 func (s *Scheduler) Logger(ctx context.Context) *zap.Logger {
 	return queue.GetLogger(ctx)
 }
@@ -123,4 +112,37 @@ func (s *Scheduler) gracefulShutdown() {
 	}
 	s.worker.Stop()
 	close(s.done)
+}
+
+func (s *Scheduler) failAndLogFn(ctx context.Context, service *eve.DeployArtifact, plan *eve.NSDeploymentPlan) func(err error, format string, a ...interface{}) {
+	return func(err error, format string, a ...interface{}) {
+		format = format + " [service:%s]"
+		a = append(a, service.ArtifactName)
+		plan.Message(format, a...)
+		service.Result = eve.DeployArtifactResultFailed
+		if err == nil {
+			s.Logger(ctx).Error(fmt.Sprintf(format, a...), zap.String("service", service.ArtifactName))
+		} else {
+			s.Logger(ctx).Error(fmt.Sprintf(format, a...), zap.String("service", service.ArtifactName), zap.Error(err))
+		}
+	}
+}
+
+func getK8sClient() (*kubernetes.Clientset, error) {
+	c, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, errors.Wrap(err)
+	}
+
+	client, err := kubernetes.NewForConfig(c)
+	if err != nil {
+		return nil, errors.Wrap(err)
+	}
+
+	return client, nil
+}
+
+func getDockerImageName(artifact *eve.DeployArtifact) string {
+	repo := fmt.Sprintf(DockerRepoFormat, artifact.ArtifactoryFeed)
+	return fmt.Sprintf("%s/%s:%s", repo, artifact.ArtifactoryPath, artifact.EvalImageTag())
 }
