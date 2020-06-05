@@ -129,6 +129,7 @@ func getK8sMigrationJob(
 					},
 				},
 				Spec: apiv1.PodSpec{
+					RestartPolicy: apiv1.RestartPolicyNever,
 					SecurityContext: &apiv1.PodSecurityContext{
 						RunAsUser:  int64Ptr(int64(runAs)),
 						RunAsGroup: int64Ptr(int64(runAs)),
@@ -140,7 +141,6 @@ func getK8sMigrationJob(
 							Name:            artifactName,
 							ImagePullPolicy: apiv1.PullAlways,
 							Image:           containerImage,
-							Ports:           []apiv1.ContainerPort{},
 						},
 					},
 					ImagePullSecrets: []apiv1.LocalObjectReference{
