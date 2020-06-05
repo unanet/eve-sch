@@ -108,7 +108,7 @@ func (s *Scheduler) runDockerMigrationJob(ctx context.Context, migration *eve.De
 	}
 
 	for _, x := range pods.Items {
-		if x.Status.ContainerStatuses[0].State.Terminated != nil {
+		if x.Status.ContainerStatuses[0].State.Terminated == nil {
 			fail(nil, "an error occurred while trying to migrate: %s, timed out waiting for migration to finish.", migration.DatabaseName)
 			return
 		}
