@@ -49,7 +49,7 @@ func (s *Scheduler) runDockerMigrationJob(ctx context.Context, migration *eve.De
 		migration.RunAs)
 	setupJobEnvironment(migration.Metadata, job)
 
-	_, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Get(ctx, migration.DatabaseName, metav1.GetOptions{})
+	_, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Get(ctx, jobName, metav1.GetOptions{})
 	if err == nil {
 		err = k8s.BatchV1().Jobs(plan.Namespace.Name).Delete(ctx, jobName, metav1.DeleteOptions{})
 		if err != nil {
