@@ -109,7 +109,7 @@ func (s *Scheduler) runDockerMigrationJob(ctx context.Context, migration *eve.De
 
 			if x.State.Terminated.ExitCode != 0 {
 				migration.Result = eve.DeployArtifactResultFailed
-				plan.Message("migration failed, exit code: %d", x.State.Terminated.ExitCode)
+				plan.Message("migration failed, exit code: %d, database: %s", x.State.Terminated.ExitCode, migration.DatabaseName)
 				return
 			}
 		}
