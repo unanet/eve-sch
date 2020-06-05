@@ -37,9 +37,10 @@ func (s *Scheduler) runDockerMigrationJob(ctx context.Context, migration *eve.De
 		fail(err, "an error occurred trying to get the k8s client")
 		return
 	}
+	jobName := fmt.Sprintf("%s-migration", migration.DatabaseName)
 	imageName := getDockerImageName(migration.DeployArtifact)
 	job := getK8sMigrationJob(
-		migration.DatabaseName,
+		jobName,
 		plan.Namespace.Name,
 		migration.ServiceAccount,
 		migration.ArtifactName,
@@ -50,7 +51,7 @@ func (s *Scheduler) runDockerMigrationJob(ctx context.Context, migration *eve.De
 
 	_, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Get(ctx, migration.DatabaseName, metav1.GetOptions{})
 	if err == nil {
-		err = k8s.BatchV1().Jobs(plan.Namespace.Name).Delete(ctx, migration.DatabaseName, metav1.DeleteOptions{})
+		err = k8s.BatchV1().Jobs(plan.Namespace.Name).Delete(ctx, jobName, metav1.DeleteOptions{})
 		if err != nil {
 			fail(err, "an error occurred trying to delete the old migration job")
 			return
@@ -68,7 +69,7 @@ func (s *Scheduler) runDockerMigrationJob(ctx context.Context, migration *eve.De
 		return
 	}
 
-	labelSelector := fmt.Sprintf("job=%s,version=%s", migration.DatabaseName, migration.AvailableVersion)
+	labelSelector := fmt.Sprintf("job=%s,version=%s", jobName, migration.AvailableVersion)
 	pods := k8s.CoreV1().Pods(plan.Namespace.Name)
 	watch, err := pods.Watch(ctx, metav1.ListOptions{
 		TypeMeta:       metav1.TypeMeta{},
