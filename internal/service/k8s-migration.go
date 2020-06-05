@@ -70,8 +70,8 @@ func (s *Scheduler) runDockerMigrationJob(ctx context.Context, migration *eve.De
 	}
 
 	labelSelector := fmt.Sprintf("job=%s,version=%s", jobName, migration.AvailableVersion)
-	pods := k8s.CoreV1().Pods(plan.Namespace.Name)
-	watch, err := pods.Watch(ctx, metav1.ListOptions{
+	watchPods := k8s.CoreV1().Pods(plan.Namespace.Name)
+	watch, err := watchPods.Watch(ctx, metav1.ListOptions{
 		TypeMeta:       metav1.TypeMeta{},
 		LabelSelector:  labelSelector,
 		TimeoutSeconds: int64Ptr(config.GetConfig().K8sDeployTimeoutSec),
@@ -97,6 +97,27 @@ func (s *Scheduler) runDockerMigrationJob(ctx context.Context, migration *eve.De
 				plan.Message("migration failed, exit code: %d", x.State.Terminated.ExitCode)
 				return
 			}
+		}
+	}
+
+	// make sure we don't get a false positive and actually check
+	pods, err := k8s.CoreV1().Pods(plan.Namespace.Name).List(ctx, metav1.ListOptions{
+		LabelSelector: labelSelector,
+	})
+	if err != nil {
+		fail(nil, "an error occurred while trying to migrate: %s, timed out waiting for migration to finish.", migration.DatabaseName)
+		return
+	}
+
+	for _, x := range pods.Items {
+		if x.Status.ContainerStatuses[0].State.Terminated != nil {
+			fail(nil, "an error occurred while trying to migrate: %s, timed out waiting for migration to finish.", migration.DatabaseName)
+			return
+		}
+
+		if x.Status.ContainerStatuses[0].State.Terminated.ExitCode != 0 {
+			fail(nil, "an error occurred while trying to migrate: %s, exit code: %d", migration.DatabaseName, x.Status.ContainerStatuses[0].State.Terminated.ExitCode)
+			return
 		}
 	}
 
