@@ -152,6 +152,7 @@ func getK8sMigrationJob(
 			Namespace: namespace,
 		},
 		Spec: batchv1.JobSpec{
+			BackoffLimit: int32Ptr(0),
 			Template: apiv1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
