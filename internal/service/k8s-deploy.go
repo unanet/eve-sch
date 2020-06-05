@@ -161,7 +161,7 @@ func setupMetrics(port int, deployment *appsv1.Deployment) {
 }
 
 func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.DeployService, plan *eve.NSDeploymentPlan) {
-	fail := s.failAndLogFn(ctx, service.DeployArtifact, plan)
+	fail := s.failAndLogFn(ctx, service.ServiceName, service.DeployArtifact, plan)
 	k8s, err := getK8sClient()
 	if err != nil {
 		fail(err, "an error occurred trying to get the k8s client")

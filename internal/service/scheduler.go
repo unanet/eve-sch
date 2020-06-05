@@ -114,16 +114,22 @@ func (s *Scheduler) gracefulShutdown() {
 	close(s.done)
 }
 
-func (s *Scheduler) failAndLogFn(ctx context.Context, service *eve.DeployArtifact, plan *eve.NSDeploymentPlan) func(err error, format string, a ...interface{}) {
+func (s *Scheduler) failAndLogFn(ctx context.Context, optName string, service *eve.DeployArtifact, plan *eve.NSDeploymentPlan) func(err error, format string, a ...interface{}) {
 	return func(err error, format string, a ...interface{}) {
-		format = format + " [service:%s]"
-		a = append(a, service.ArtifactName)
+		if len(optName) == 0 {
+			format = format + " [artifact:%s]"
+			a = append(a, service.ArtifactName)
+		} else {
+			format = format + " (%s)[artifact:%s]"
+			a = append(a, optName, service.ArtifactName)
+		}
+
 		plan.Message(format, a...)
 		service.Result = eve.DeployArtifactResultFailed
 		if err == nil {
-			s.Logger(ctx).Error(fmt.Sprintf(format, a...), zap.String("service", service.ArtifactName))
+			s.Logger(ctx).Error(fmt.Sprintf(format, a...), zap.String("artifact", service.ArtifactName), zap.String("deploy_name", optName))
 		} else {
-			s.Logger(ctx).Error(fmt.Sprintf(format, a...), zap.String("service", service.ArtifactName), zap.Error(err))
+			s.Logger(ctx).Error(fmt.Sprintf(format, a...), zap.String("artifact", service.ArtifactName), zap.String("deploy_name", optName), zap.Error(err))
 		}
 	}
 }

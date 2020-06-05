@@ -31,7 +31,7 @@ func setupJobEnvironment(metadata map[string]interface{}, job *batchv1.Job) {
 }
 
 func (s *Scheduler) runDockerMigrationJob(ctx context.Context, migration *eve.DeployMigration, plan *eve.NSDeploymentPlan) {
-	fail := s.failAndLogFn(ctx, migration.DeployArtifact, plan)
+	fail := s.failAndLogFn(ctx, migration.DatabaseName, migration.DeployArtifact, plan)
 	k8s, err := getK8sClient()
 	if err != nil {
 		fail(err, "an error occurred trying to get the k8s client")
