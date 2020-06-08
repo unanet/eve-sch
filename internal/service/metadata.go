@@ -3,6 +3,8 @@ package service
 import (
 	"bytes"
 	"encoding/json"
+	"strings"
+	"text/template"
 
 	"github.com/docker/docker/utils/templates"
 	"gitlab.unanet.io/devops/eve/pkg/eve"
@@ -18,13 +20,21 @@ type TemplateMigrationData struct {
 	Migration *eve.DeployMigration
 }
 
+func replace(input, from, to string) string {
+	return strings.Replace(input, from, to, -1)
+}
+
 func ParseServiceMetadata(metadata map[string]interface{}, service *eve.DeployService, plan *eve.NSDeploymentPlan) (map[string]interface{}, error) {
 	metadataJson, err := json.Marshal(metadata)
 	if err != nil {
 		return nil, err
 	}
 
-	temp, err := templates.Parse(string(metadataJson))
+	temp := template.New("metadata")
+	temp.Funcs(template.FuncMap{
+		"replace": replace,
+	})
+	temp, err = temp.Parse(string(metadataJson))
 	if err != nil {
 		return nil, err
 	}
