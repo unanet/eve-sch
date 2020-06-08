@@ -3,8 +3,8 @@ package service
 import (
 	"bytes"
 	"encoding/json"
+	"html/template"
 	"strings"
-	"text/template"
 
 	"github.com/docker/docker/utils/templates"
 	"gitlab.unanet.io/devops/eve/pkg/eve"
