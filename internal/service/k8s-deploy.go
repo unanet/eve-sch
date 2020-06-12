@@ -2,12 +2,14 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
 	"gitlab.unanet.io/devops/eve/pkg/eve"
+	"go.uber.org/zap"
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
@@ -160,6 +162,19 @@ func setupMetrics(port int, deployment *appsv1.Deployment) {
 	deployment.Spec.Template.ObjectMeta.Annotations = annotations
 }
 
+func (s *Scheduler) setupLivelinessProbe(ctx context.Context, probeBytes []byte, deployment *appsv1.Deployment) {
+	if len(probeBytes) == 0 {
+		return
+	}
+	var probe apiv1.Probe
+	err := json.Unmarshal(probeBytes, &probe)
+	if err != nil {
+		s.Logger(ctx).Warn("failed to unmarshal the liveliness probe", zap.Error(err))
+		return
+	}
+	deployment.Spec.Template.Spec.Containers[0].LivenessProbe = &probe
+}
+
 func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.DeployService, plan *eve.NSDeploymentPlan) {
 	fail := s.failAndLogFn(ctx, service.ServiceName, service.DeployArtifact, plan)
 	k8s, err := getK8sClient()
@@ -182,6 +197,7 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 	setupDeploymentEnvironment(service.Metadata, deployment)
 	setupMetrics(service.MetricsPort, deployment)
 	setupPorts(service.ServicePort, service.MetricsPort, deployment)
+	s.setupLivelinessProbe(ctx, service.LivelinessProbe, deployment)
 
 	if service.ServicePort > 0 {
 		_, err := k8s.CoreV1().Services(plan.Namespace.Name).Get(ctx, service.ServiceName, metav1.GetOptions{})
