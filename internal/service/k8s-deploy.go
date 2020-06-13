@@ -166,10 +166,14 @@ func (s *Scheduler) setupLivelinessProbe(ctx context.Context, probeBytes []byte,
 	if len(probeBytes) == 0 {
 		return
 	}
+	s.Logger(ctx).Info(fmt.Sprintf("######## %d ########", len(probeBytes)))
 	var probe apiv1.Probe
 	err := json.Unmarshal(probeBytes, &probe)
 	if err != nil {
 		s.Logger(ctx).Warn("failed to unmarshal the liveliness probe", zap.Error(err))
+		return
+	}
+	if probe.Handler.Exec == nil && probe.Handler.HTTPGet == nil && probe.Handler.TCPSocket == nil {
 		return
 	}
 	deployment.Spec.Template.Spec.Containers[0].LivenessProbe = &probe
