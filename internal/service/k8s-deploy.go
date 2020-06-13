@@ -163,10 +163,9 @@ func setupMetrics(port int, deployment *appsv1.Deployment) {
 }
 
 func (s *Scheduler) setupLivelinessProbe(ctx context.Context, probeBytes []byte, deployment *appsv1.Deployment) {
-	if len(probeBytes) == 0 {
+	if len(probeBytes) < 5 {
 		return
 	}
-	s.Logger(ctx).Info(fmt.Sprintf("######## %d ########", len(probeBytes)))
 	var probe apiv1.Probe
 	err := json.Unmarshal(probeBytes, &probe)
 	if err != nil {
@@ -174,6 +173,7 @@ func (s *Scheduler) setupLivelinessProbe(ctx context.Context, probeBytes []byte,
 		return
 	}
 	if probe.Handler.Exec == nil && probe.Handler.HTTPGet == nil && probe.Handler.TCPSocket == nil {
+		s.Logger(ctx).Warn("invalid liveliness prove, the handler was not set")
 		return
 	}
 	deployment.Spec.Template.Spec.Containers[0].LivenessProbe = &probe
