@@ -12,7 +12,7 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/satori/go.uuid v1.2.0
 	github.com/stretchr/testify v1.4.0
-	gitlab.unanet.io/devops/eve v0.0.0-20200612232712-1b21fb2b9cbd
+	gitlab.unanet.io/devops/eve v0.0.0-20200618014631-02b1440ca22a
 	go.uber.org/zap v1.15.0
 	golang.org/x/crypto v0.0.0-20200429183012-4b2356b1ed79 // indirect
 	golang.org/x/net v0.0.0-20200506145744-7e3656a0809f // indirect

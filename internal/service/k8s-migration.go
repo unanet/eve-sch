@@ -3,11 +3,13 @@ package service
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"gitlab.unanet.io/devops/eve/pkg/eve"
 	batchv1 "k8s.io/api/batch/v1"
 	apiv1 "k8s.io/api/core/v1"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"gitlab.unanet.io/devops/eve-sch/internal/config"
@@ -38,6 +40,7 @@ func (s *Scheduler) runDockerMigrationJob(ctx context.Context, migration *eve.De
 		fail(err, "an error occurred trying to get the k8s client")
 		return
 	}
+	timeNuance := strconv.Itoa(int(time.Now().Unix()))
 	jobName := fmt.Sprintf("%s-migration", migration.DatabaseName)
 	labelSelector := fmt.Sprintf("job=%s", jobName)
 	imageName := getDockerImageName(migration.DeployArtifact)
@@ -48,10 +51,9 @@ func (s *Scheduler) runDockerMigrationJob(ctx context.Context, migration *eve.De
 		migration.ArtifactName,
 		imageName,
 		migration.AvailableVersion,
+		timeNuance,
 		migration.RunAs)
 	setupJobEnvironment(migration.Metadata, job)
-
-	_ = k8s.BatchV1().Jobs(plan.Namespace.Name).Delete(ctx, jobName, metav1.DeleteOptions{})
 
 	existingPods, err := k8s.CoreV1().Pods(plan.Namespace.Name).List(ctx, metav1.ListOptions{
 		TypeMeta:      metav1.TypeMeta{},
@@ -64,25 +66,25 @@ func (s *Scheduler) runDockerMigrationJob(ctx context.Context, migration *eve.De
 		}
 	}
 
-	for i := 1; i < 60; i++ {
-		time.Sleep(1 * time.Second)
-		existingPods, err := k8s.CoreV1().Pods(plan.Namespace.Name).List(ctx, metav1.ListOptions{
-			TypeMeta:      metav1.TypeMeta{},
-			LabelSelector: fmt.Sprintf("job=%s", jobName),
-		})
-		if err != nil {
-			fail(err, "an error occurred trying to wait for old migration jobs to be removed")
+	_, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Get(ctx, jobName, metav1.GetOptions{})
+	if err != nil {
+		if k8sErrors.IsNotFound(err) {
+			_, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Create(ctx, job, metav1.CreateOptions{})
+			if err != nil {
+				fail(err, "an error occurred trying to create the migration job")
+				return
+			}
+		} else {
+			fail(err, "an error occurred trying to check for the migration job")
 			return
 		}
-		if len(existingPods.Items) == 0 {
-			break
+	} else {
+		// we were able to retrieve the job which means we need to run update instead of create
+		_, err := k8s.BatchV1().Jobs(plan.Namespace.Name).Update(ctx, job, metav1.UpdateOptions{})
+		if err != nil {
+			fail(err, "an error occurred trying to update the deployment")
+			return
 		}
-	}
-
-	_, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Create(ctx, job, metav1.CreateOptions{})
-	if err != nil {
-		fail(err, "an error occurred trying to create the migration job")
-		return
 	}
 
 	watchPods := k8s.CoreV1().Pods(plan.Namespace.Name)
@@ -145,7 +147,8 @@ func getK8sMigrationJob(
 	serviceAccountName,
 	artifactName,
 	containerImage,
-	artifactVersion string, runAs int) *batchv1.Job {
+	artifactVersion,
+	nuance string, runAs int) *batchv1.Job {
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobName,
@@ -156,7 +159,10 @@ func getK8sMigrationJob(
 			Template: apiv1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"job":     jobName,
+						"job": jobName,
+					},
+					Annotations: map[string]string{
+						"nuance":  nuance,
 						"version": artifactVersion,
 					},
 				},

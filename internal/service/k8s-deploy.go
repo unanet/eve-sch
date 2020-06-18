@@ -82,11 +82,13 @@ func getK8sDeployment(
 			},
 			Template: apiv1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
+					// TODO: we should move the version and nuance to annotations, but it's watching for these labels to see if the deploy was successful
 					Labels: map[string]string{
 						"app":     serviceName,
 						"version": artifactVersion,
 						"nuance":  nuance,
 					},
+					Annotations: map[string]string{},
 				},
 				Spec: apiv1.PodSpec{
 					SecurityContext: &apiv1.PodSecurityContext{
