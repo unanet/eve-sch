@@ -34,6 +34,10 @@ spec:
               value: {{ .Values.eveS3Bucket }}
             - name: EVE_AWS_REGION 
               value: {{ .Values.eveAWSRegion }}
+            - name: AWS_ACCESS_KEY_ID
+              value: {{ .Values.awsAccessKeyID }}
+            - name: AWS_SECRET_ACCESS_KEY
+              value: {{ .Values.awsSecretAccessKey }}
           ports:
             - containerPort: 3001
               name: metrics
