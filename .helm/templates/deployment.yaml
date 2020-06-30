@@ -38,6 +38,8 @@ spec:
               value: {{ .Values.awsAccessKeyID }}
             - name: AWS_SECRET_ACCESS_KEY
               value: {{ .Values.awsSecretAccessKey }}
+            - name: VAULT_ROLE
+              value: {{ .Values.vaultRole }}
           ports:
             - containerPort: 3001
               name: metrics
