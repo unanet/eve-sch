@@ -43,7 +43,7 @@ spec:
             - name: VAULT_ADDR
               value: {{ .Values.vaultAddr }}
             - name: VAULT_K8S_MOUNT
-              value: {{ .VAlues.vaultK8sMount }}
+              value: {{ .Values.vaultK8sMount }}
           ports:
             - containerPort: 3001
               name: metrics
