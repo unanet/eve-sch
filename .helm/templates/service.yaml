@@ -1,8 +1,9 @@
+---
 apiVersion: v1
 kind: Service
 metadata:
   name: eve-sch-v1
-  namespace: eve-sch
+  namespace: {{ .Release.Namespace }}
 spec:
   ports:
     - port: 3001

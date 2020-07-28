@@ -1,8 +1,9 @@
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: eve-sch-v1
-  namespace: eve-sch
+  namespace: {{ .Release.Namespace }}
 spec:
   selector:
     matchLabels:
@@ -16,14 +17,14 @@ spec:
       labels:
         app: eve-sch-v1
     spec:
-      serviceAccountName: eve-sch
+      serviceAccountName: {{ .Values.serviceAccount }}
       securityContext:
         runAsUser: 1101
         runAsGroup: 1101
         fsGroup: 65534
       containers:
         - name: eve-sch-v1
-          image: unanet-docker.jfrog.io/ops/eve-sch-v1:0.1.0
+          image: {{ .Values.image }}
           imagePullPolicy: Always
           env:
             - name: EVE_API_Q_URL
