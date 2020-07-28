@@ -57,7 +57,7 @@ build:
 	docker pull unanet-docker.jfrog.io/alpine-base
 	mkdir -p bin
 	$(docker-exec) go build -o ./bin/eve-sch ./cmd/eve-sch/main.go
-	docker build . -t ${IMAGE_NAME}:${VERSION} -t $${IMAGE_NAME}:${PATCH_VERSION}
+	docker build . -t ${IMAGE_NAME}:${VERSION} -t ${IMAGE_NAME}:${PATCH_VERSION}
 	$(docker-helm-exec) package --version ${PATCH_VERSION} --app-version ${VERSION} ./.helm
 
 
