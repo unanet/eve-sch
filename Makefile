@@ -49,7 +49,6 @@ docker-exec = docker run --rm \
 	${BUILD_IMAGE}
 
 
-
 .PHONY: build dist test
 
 build:
@@ -57,7 +56,7 @@ build:
 	docker pull unanet-docker.jfrog.io/alpine-base
 	mkdir -p bin
 	$(docker-exec) go build -o ./bin/eve-sch ./cmd/eve-sch/main.go
-	docker build . -t ${IMAGE_NAME}:${VERSION} -t ${IMAGE_NAME}:${PATCH_VERSION}
+	docker build . -t ${IMAGE_NAME}:${PATCH_VERSION}
 	$(docker-helm-exec) package --version ${PATCH_VERSION} --app-version ${VERSION} ./.helm
 
 
@@ -68,10 +67,9 @@ test:
 
 dist: build
 	docker push ${IMAGE_NAME}:${PATCH_VERSION}
-	docker push ${IMAGE_NAME}:${VERSION}
 	curl --fail -H "X-JFrog-Art-Api:${JFROG_API_KEY}" \
 		-X PUT \
-		https://unanet.jfrog.io/unanet/api/storage/docker-int-local/ops/eve-sch-v1/${VERSION}\?properties=version=${VERSION}%7Cgitlab-build-properties.project-id=${CI_PROJECT_ID}%7Cgitlab-build-properties.git-sha=${CI_COMMIT_SHORT_SHA}%7Cgitlab-build-properties.git-branch=${CI_COMMIT_BRANCH}
+		https://unanet.jfrog.io/unanet/api/storage/docker-int-local/ops/eve-sch-v1/${PATCH_VERSION}\?properties=version=${VERSION}%7Cgitlab-build-properties.project-id=${CI_PROJECT_ID}%7Cgitlab-build-properties.git-sha=${CI_COMMIT_SHORT_SHA}%7Cgitlab-build-properties.git-branch=${CI_COMMIT_BRANCH}
 	curl --fail -H "X-JFrog-Art-Api:${JFROG_API_KEY}" \
 		-T eve-sch-${PATCH_VERSION}.tgz "https://unanet.jfrog.io/artifactory/helm-local/eve-sch/eve-sch-${PATCH_VERSION}.tgz"
 
