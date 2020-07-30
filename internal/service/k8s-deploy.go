@@ -103,6 +103,7 @@ func getK8sDeployment(
 							Ports:           []apiv1.ContainerPort{},
 						},
 					},
+					TerminationGracePeriodSeconds: int64Ptr(300),
 					ImagePullSecrets: []apiv1.LocalObjectReference{
 						{
 							Name: "docker-cfg",
