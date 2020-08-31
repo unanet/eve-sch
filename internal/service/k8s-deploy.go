@@ -163,6 +163,23 @@ func setupMetrics(port int, deployment *appsv1.Deployment) {
 	deployment.Spec.Template.ObjectMeta.Annotations = annotations
 }
 
+func (s *Scheduler) setupReadinessProbe(ctx context.Context, probeBytes []byte, deployment *appsv1.Deployment) {
+	if len(probeBytes) < 5 {
+		return
+	}
+	var probe apiv1.Probe
+	err := json.Unmarshal(probeBytes, &probe)
+	if err != nil {
+		s.Logger(ctx).Warn("failed to unmarshal the readiness probe", zap.Error(err))
+		return
+	}
+	if probe.Handler.Exec == nil && probe.Handler.HTTPGet == nil && probe.Handler.TCPSocket == nil {
+		s.Logger(ctx).Warn("invalid readiness probe, the handler was not set")
+		return
+	}
+	deployment.Spec.Template.Spec.Containers[0].ReadinessProbe = &probe
+}
+
 func (s *Scheduler) setupLivelinessProbe(ctx context.Context, probeBytes []byte, deployment *appsv1.Deployment) {
 	if len(probeBytes) < 5 {
 		return
@@ -174,7 +191,7 @@ func (s *Scheduler) setupLivelinessProbe(ctx context.Context, probeBytes []byte,
 		return
 	}
 	if probe.Handler.Exec == nil && probe.Handler.HTTPGet == nil && probe.Handler.TCPSocket == nil {
-		s.Logger(ctx).Warn("invalid liveliness prove, the handler was not set")
+		s.Logger(ctx).Warn("invalid liveliness probe, the handler was not set")
 		return
 	}
 	deployment.Spec.Template.Spec.Containers[0].LivenessProbe = &probe
@@ -203,6 +220,7 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 	setupMetrics(service.MetricsPort, deployment)
 	setupPorts(service.ServicePort, service.MetricsPort, deployment)
 	s.setupLivelinessProbe(ctx, service.LivelinessProbe, deployment)
+	s.setupReadinessProbe(ctx, service.ReadinessProbe, deployment)
 
 	if service.ServicePort > 0 {
 		_, err := k8s.CoreV1().Services(plan.Namespace.Name).Get(ctx, service.ServiceName, metav1.GetOptions{})

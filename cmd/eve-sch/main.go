@@ -25,7 +25,7 @@ func main() {
 		log.Logger.Panic("failed to create aws session", zap.Error(err))
 	}
 
-	vault, err := vault.NewClient()
+	vaultClient, err := vault.NewClient()
 	if err != nil {
 		log.Logger.Panic("failed to create the vault secrets client")
 	}
@@ -46,5 +46,5 @@ func main() {
 	fnTrigger := fn.NewTrigger(1 * time.Hour)
 
 	worker := queue.NewWorker("eve-sch", schQueue, c.SchQWorkerTimeout)
-	service.NewScheduler(worker, s3Downloader, s3Uploader, c.ApiQUrl, vault, fnTrigger).Start()
+	service.NewScheduler(worker, s3Downloader, s3Uploader, c.ApiQUrl, vaultClient, fnTrigger).Start()
 }
