@@ -3,68 +3,77 @@ package service
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"gitlab.unanet.io/devops/eve/pkg/eve"
 	batchv1 "k8s.io/api/batch/v1"
 	apiv1 "k8s.io/api/core/v1"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"gitlab.unanet.io/devops/eve-sch/internal/config"
 )
 
-func (s *Scheduler) runDockerMigrationJob(ctx context.Context, migration *eve.DeployMigration, plan *eve.NSDeploymentPlan) {
-	fail := s.failAndLogFn(ctx, migration.DatabaseName, migration.DeployArtifact, plan)
+func setupJobEnvironment(metadata map[string]interface{}, job *batchv1.Job) {
+	var containerEnvVars []apiv1.EnvVar
+
+	for k, v := range metadata {
+		value, ok := v.(string)
+		if !ok {
+			continue
+		}
+		containerEnvVars = append(containerEnvVars, apiv1.EnvVar{
+			Name:  k,
+			Value: value,
+		})
+	}
+
+	job.Spec.Template.Spec.Containers[0].Env = containerEnvVars
+}
+
+func (s *Scheduler) runDockerJob(ctx context.Context, job *eve.DeployJob, plan *eve.NSDeploymentPlan) {
+	fail := s.failAndLogFn(ctx, job.JobName, job.DeployArtifact, plan)
 
 	k8s, err := getK8sClient()
 	if err != nil {
 		fail(err, "an error occurred trying to get the k8s client")
 		return
 	}
-	jobName := fmt.Sprintf("%s-migration", migration.DatabaseName)
-	labelSelector := fmt.Sprintf("job=%s", jobName)
-	imageName := getDockerImageName(migration.DeployArtifact)
-	job := getK8sMigrationJob(
-		jobName,
+	labelSelector := fmt.Sprintf("job=%s", job.JobName)
+	imageName := getDockerImageName(job.DeployArtifact)
+	k8sJob := getK8sJob(
+		job.JobName,
 		plan.Namespace.Name,
-		migration.ServiceAccount,
-		migration.ArtifactName,
+		job.ServiceAccount,
+		job.ArtifactName,
 		imageName,
-		migration.AvailableVersion,
-		migration.RunAs)
-	setupJobEnvironment(migration.Metadata, job)
+		job.AvailableVersion,
+		job.RunAs)
+	setupJobEnvironment(job.Metadata, k8sJob)
 
-	_ = k8s.BatchV1().Jobs(plan.Namespace.Name).Delete(ctx, jobName, metav1.DeleteOptions{})
-
-	existingPods, err := k8s.CoreV1().Pods(plan.Namespace.Name).List(ctx, metav1.ListOptions{
-		TypeMeta:      metav1.TypeMeta{},
-		LabelSelector: labelSelector,
-	})
-
-	if err == nil {
-		for _, x := range existingPods.Items {
-			_ = k8s.CoreV1().Pods(plan.Namespace.Name).Delete(ctx, x.Name, metav1.DeleteOptions{})
-		}
-	}
-
-	for i := 1; i < 60; i++ {
-		time.Sleep(1 * time.Second)
-		existingPods, err := k8s.CoreV1().Pods(plan.Namespace.Name).List(ctx, metav1.ListOptions{
-			TypeMeta:      metav1.TypeMeta{},
-			LabelSelector: fmt.Sprintf("job=%s", jobName),
-		})
+	_, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Get(ctx, job.JobName, metav1.GetOptions{})
+	if k8sErrors.IsNotFound(err) {
+		_, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Create(ctx, k8sJob, metav1.CreateOptions{})
 		if err != nil {
-			fail(err, "an error occurred trying to wait for old migration jobs to be removed")
+			fail(err, "an error occurred trying to create the job", job.JobName)
 			return
 		}
-		if len(existingPods.Items) == 0 {
-			break
+	} else if err == nil {
+		existingPods, err := k8s.CoreV1().Pods(plan.Namespace.Name).List(ctx, metav1.ListOptions{
+			TypeMeta:      metav1.TypeMeta{},
+			LabelSelector: labelSelector,
+		})
+		if err == nil {
+			for _, x := range existingPods.Items {
+				_ = k8s.CoreV1().Pods(plan.Namespace.Name).Delete(ctx, x.Name, metav1.DeleteOptions{})
+			}
 		}
-	}
-
-	_, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Create(ctx, job, metav1.CreateOptions{})
-	if err != nil {
-		fail(err, "an error occurred trying to create the migration job")
+		_, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Update(ctx, k8sJob, metav1.UpdateOptions{})
+		if err != nil {
+			fail(err, "an error occurred trying to update the job")
+			return
+		}
+	} else {
+		fail(err, "an error occurred trying to see if the job exists", job.JobName)
 		return
 	}
 
@@ -75,7 +84,7 @@ func (s *Scheduler) runDockerMigrationJob(ctx context.Context, migration *eve.De
 		TimeoutSeconds: int64Ptr(config.GetConfig().K8sDeployTimeoutSec),
 	})
 	if err != nil {
-		fail(err, "an error occurred trying to watch the pod, migration may have succeeded")
+		fail(err, "an error occurred trying to watch the pod, job may have succeeded")
 		return
 	}
 
@@ -91,8 +100,8 @@ func (s *Scheduler) runDockerMigrationJob(ctx context.Context, migration *eve.De
 			watch.Stop()
 
 			if x.State.Terminated.ExitCode != 0 {
-				migration.Result = eve.DeployArtifactResultFailed
-				plan.Message("migration failed, exit code: %d, database: %s", x.State.Terminated.ExitCode, migration.DatabaseName)
+				job.Result = eve.DeployArtifactResultFailed
+				plan.Message("job failed, exit code: %d, job: %s", x.State.Terminated.ExitCode, job.JobName)
 				return
 			}
 		}
@@ -103,26 +112,26 @@ func (s *Scheduler) runDockerMigrationJob(ctx context.Context, migration *eve.De
 		LabelSelector: labelSelector,
 	})
 	if err != nil {
-		fail(nil, "an error occurred while trying to migrate: %s, timed out waiting for migration to finish.", migration.DatabaseName)
+		fail(nil, "an error occurred while trying to run job: %s, timed out waiting for job to finish.", job.JobName)
 		return
 	}
 
 	for _, x := range pods.Items {
 		if x.Status.ContainerStatuses[0].State.Terminated == nil {
-			fail(nil, "an error occurred while trying to migrate: %s, timed out waiting for migration to finish.", migration.DatabaseName)
+			fail(nil, "an error occurred while trying to run job: %s, timed out waiting for job to finish.", job.JobName)
 			return
 		}
 
 		if x.Status.ContainerStatuses[0].State.Terminated.ExitCode != 0 {
-			fail(nil, "an error occurred while trying to migrate: %s, exit code: %d", migration.DatabaseName, x.Status.ContainerStatuses[0].State.Terminated.ExitCode)
+			fail(nil, "an error occurred while trying to run job: %s, exit code: %d", job.JobName, x.Status.ContainerStatuses[0].State.Terminated.ExitCode)
 			return
 		}
 	}
 
-	migration.Result = eve.DeployArtifactResultSuccess
+	job.Result = eve.DeployArtifactResultSuccess
 }
 
-func getK8sMigrationJob(
+func getK8sJob(
 	jobName,
 	namespace,
 	serviceAccountName,

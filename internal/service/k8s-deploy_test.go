@@ -5,7 +5,6 @@ package service
 import (
 	"context"
 	"flag"
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -47,16 +46,8 @@ func TestScheduler_deployNamespace(t *testing.T) {
 	k8s := GetK8sClient(t)
 	ctx := context.TODO()
 
-	labelSelector := fmt.Sprintf("job=%s", "unaneta-migration")
-	// make sure we don't get a false positive and actually check
-	pods, err := k8s.CoreV1().Pods("una-int-current").List(ctx, metav1.ListOptions{
-		LabelSelector: labelSelector,
-	})
+	job, err := k8s.BatchV1().Jobs("una-int-current").Get(ctx, "unaneta-migration", metav1.GetOptions{})
 	require.NoError(t, err)
-	require.True(t, len(pods.Items) > 0)
-	for _, x := range pods.Items {
-		require.NotNil(t, x.Status.ContainerStatuses[0].State.Terminated)
-		fmt.Println(x.Status.ContainerStatuses[0].State.Terminated)
-	}
+	require.NotNil(t, job)
 
 }

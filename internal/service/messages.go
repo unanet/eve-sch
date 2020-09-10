@@ -41,6 +41,20 @@ func (s *Scheduler) deployNamespace(ctx context.Context, m *queue.M) error {
 		}
 	}
 
+	for _, x := range plan.Jobs {
+		x.Metadata, err = ParseJobMetadata(x.Metadata, x, plan)
+		if err != nil {
+			plan.Message("could not parse metadata, job: %s, error: %s", x.ArtifactName, err)
+		}
+
+		if x.ArtifactoryFeedType == eve.ArtifactoryFeedTypeDocker {
+			s.runDockerJob(ctx, x, plan)
+		}
+		if len(x.ArtifactFnPtr) > 0 {
+			s.triggerFunction(ctx, x.JobName, x.DeployArtifact, plan)
+		}
+	}
+
 	for _, x := range plan.Migrations {
 		x.Metadata, err = ParseMigrationMetadata(x.Metadata, x, plan)
 		if err != nil {
