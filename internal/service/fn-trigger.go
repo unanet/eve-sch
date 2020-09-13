@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"gitlab.unanet.io/devops/eve/pkg/eve"
@@ -67,7 +68,7 @@ func (s *Scheduler) triggerFunction(ctx context.Context, optName string, service
 
 	resp, err := s.fnTrigger.Post(ctx, service.ArtifactFnPtr, fnCode, payload)
 	if err != nil {
-		fail(err, "function trigger for artifact failed")
+		fail(err, fmt.Sprintf("fnCode: %s trigger failed", fnCode))
 		return
 	}
 
