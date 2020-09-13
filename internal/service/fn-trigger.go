@@ -13,9 +13,10 @@ const (
 )
 
 func (s *Scheduler) getFunctionCode(ctx context.Context, function string) string {
+	s.Logger(ctx).Debug("find function codes", zap.String("function", function))
 	fnCodes, err := s.vault.GetKVSecrets(ctx, "fn_codes")
 	if err != nil {
-		s.Logger(ctx).Warn("could not retrieve function codes from vault", zap.Error(err))
+		s.Logger(ctx).Error("could not retrieve function codes from vault", zap.Error(err), zap.String("function", function))
 		return "empty"
 	}
 
