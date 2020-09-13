@@ -166,6 +166,10 @@ func getMap(data map[string]interface{}) map[string]string {
 func (c *Client) getKvSecret(ctx context.Context, path string) (map[string]interface{}, error) {
 	log.Logger.Debug("vault get KvSecret", zap.String("path", path))
 	token, err := c.tokenParser(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err)
+	}
+
 	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/v1/kv/data/%s", c.vaultAddr, path), nil)
 	if err != nil {
 		return nil, errors.Wrap(err)

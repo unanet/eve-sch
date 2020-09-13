@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"gitlab.unanet.io/devops/eve/pkg/errors"
 	"gitlab.unanet.io/devops/eve/pkg/eve"
 	"go.uber.org/zap"
 )
@@ -13,20 +14,17 @@ const (
 	VaultEnvPrefix = "vault:"
 )
 
-func (s *Scheduler) getFunctionCode(ctx context.Context, function string) string {
+func (s *Scheduler) getFunctionCode(ctx context.Context, function string) (string, error) {
 	s.Logger(ctx).Debug("find function codes", zap.String("function", function))
 	fnCodes, err := s.vault.GetKVSecrets(ctx, "fn_codes")
 	if err != nil {
-		s.Logger(ctx).Error("could not retrieve function codes from vault", zap.Error(err), zap.String("function", function))
-		return "empty"
+		return "", errors.Wrapf("failed to get fn_code secrets from vault for function: %s error: %v", function, err.Error())
 	}
 
 	if v, ok := fnCodes[function]; ok {
-		return v
+		return v, nil
 	}
-
-	s.Logger(ctx).Warn("could not find function code", zap.String("function", function))
-	return "empty"
+	return "", fmt.Errorf("failed to get the function code")
 }
 
 func (s *Scheduler) setSecrets(ctx context.Context, metadata map[string]interface{}) {
@@ -64,7 +62,11 @@ func (s *Scheduler) triggerFunction(ctx context.Context, optName string, service
 		payload[k] = v
 	}
 	s.setSecrets(ctx, payload)
-	fnCode := s.getFunctionCode(ctx, service.ArtifactFnPtr)
+	fnCode, err := s.getFunctionCode(ctx, service.ArtifactFnPtr)
+	if err != nil {
+		fail(err, fmt.Sprintf("get function code failed"))
+		return
+	}
 
 	resp, err := s.fnTrigger.Post(ctx, service.ArtifactFnPtr, fnCode, payload)
 	if err != nil {
