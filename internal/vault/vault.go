@@ -54,9 +54,14 @@ func TokenParserForExistingToken(_ *Client) TokenParser {
 
 func TokenParserK8s(c *Client) TokenParser {
 	return func(ctx context.Context) (string, error) {
+		log.Logger.Debug("vault kubernetes login token parser", zap.String("vault_role", c.vaultRole))
 		data, err := ioutil.ReadFile(k8sTokenPath)
 		if err != nil {
 			return "", errors.Wrap(err)
+		}
+
+		if len(data) <= 10 {
+			log.Logger.Warn("vault kubernetes login jwt token too short", zap.String("data", string(data)))
 		}
 
 		var jsonStr = []byte(fmt.Sprintf(`{"jwt":"%s", "role": "%s"}`, data, c.vaultRole))
