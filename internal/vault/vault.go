@@ -25,6 +25,7 @@ type Client struct {
 	vaultAddr   string
 	vaultRole   string
 	vaultMount  string
+	clusterName string
 	tokenParser TokenParser
 }
 
@@ -117,10 +118,11 @@ func TokenParserK8s(c *Client) TokenParser {
 }
 
 type Config struct {
-	Timeout  time.Duration `split_words:"true" default:"10s"`
-	Addr     string        `split_words:"true" default:"http://localhost:8200"`
-	Role     string        `split_words:"true" default:"vault-auth"`
-	K8sMount string        `split_words:"true" default:"kubernetes"`
+	Timeout        time.Duration `split_words:"true" default:"10s"`
+	Addr           string        `split_words:"true" default:"http://localhost:8200"`
+	Role           string        `split_words:"true" default:"vault-auth"`
+	K8sMount       string        `split_words:"true" default:"kubernetes"`
+	K8sClusterName string        `split_words:"true" default:"devops-prod"`
 }
 
 func NewClient(tokenAuthenticators ...TokenParser) (*Client, error) {
@@ -139,10 +141,11 @@ func NewClient(tokenAuthenticators ...TokenParser) (*Client, error) {
 	}
 
 	client := &Client{
-		httpClient: httpClient,
-		vaultAddr:  config.Addr,
-		vaultRole:  config.Role,
-		vaultMount: config.K8sMount,
+		httpClient:  httpClient,
+		vaultAddr:   config.Addr,
+		vaultRole:   config.Role,
+		vaultMount:  config.K8sMount,
+		clusterName: config.K8sClusterName,
 	}
 
 	if len(tokenAuthenticators) == 0 {
@@ -176,13 +179,15 @@ func getMap(data map[string]interface{}) map[string]string {
 }
 
 func (c *Client) getKvSecret(ctx context.Context, path string) (map[string]interface{}, error) {
-	log.Logger.Debug("vault get KvSecret", zap.String("path", path))
+	log.Logger.Debug("vault get KvSecret", zap.String("path", path), zap.String("cluster_name", c.clusterName))
 	token, err := c.tokenParser(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/v1/kv/data/%s", c.vaultAddr, path), nil)
+	// We are pretty restrictive on what vault data this code can get
+	// each eve-sch lives in a cluster and has access to clusters/{{VAULT_K8S_CLUSTER_NAME}}/eve-sch
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/v1/kv/data/clusters/%s/eve-sch/%s", c.vaultAddr, c.clusterName, path), nil)
 	if err != nil {
 		return nil, errors.Wrap(err)
 	}
