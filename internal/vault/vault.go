@@ -88,6 +88,10 @@ func TokenParserK8s(c *Client) TokenParser {
 			return "", errors.Wrapf("failed to json decode vault kubernetes login response: %v", err.Error())
 		}
 
+		if verrs, ok := respMap["errors"].([]string); ok {
+			return "", errors.Wrapf("vault errors: %v", strings.Join(verrs, ","))
+		}
+
 		if _, ok := respMap["auth"]; !ok {
 			return "", errors.Wrapf("/auth property not found in vault response")
 		}
