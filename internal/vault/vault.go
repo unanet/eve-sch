@@ -71,10 +71,16 @@ func TokenParserK8s(c *Client) TokenParser {
 		}
 		defer resp.Body.Close()
 
+		statusOK := resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices
+
+		if !statusOK {
+			log.Logger.Warn("vault kubernetes login failure", zap.String("status", resp.Status), zap.Int("status_code", resp.StatusCode), zap.String("vault_role", c.vaultRole))
+		}
+
 		var respMap map[string]interface{}
 		err = json.NewDecoder(resp.Body).Decode(&respMap)
 		if err != nil {
-			return "", errors.Wrap(err)
+			return "", errors.Wrapf("failed to json decode vault kubernetes login response: %v", err.Error())
 		}
 
 		if _, ok := respMap["auth"]; !ok {
@@ -94,6 +100,8 @@ func TokenParserK8s(c *Client) TokenParser {
 		if !ok {
 			return "", errors.Wrapf("/auth/client_token property not a string")
 		}
+
+		log.Logger.Debug("vault kubernetes login sucess")
 		return token, nil
 	}
 }
