@@ -24,6 +24,7 @@ type Client struct {
 	httpClient  *http.Client
 	vaultAddr   string
 	vaultRole   string
+	vaultMount  string
 	tokenParser TokenParser
 }
 
@@ -65,7 +66,7 @@ func TokenParserK8s(c *Client) TokenParser {
 		}
 
 		var jsonStr = []byte(fmt.Sprintf(`{"jwt":"%s", "role": "%s"}`, data, c.vaultRole))
-		req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("%s/v1/auth/kubernetes/login", c.vaultAddr), bytes.NewBuffer(jsonStr))
+		req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("%s/v1/auth/%s/login", c.vaultAddr, c.vaultMount), bytes.NewBuffer(jsonStr))
 		if err != nil {
 			return "", errors.Wrap(err)
 		}
@@ -116,9 +117,10 @@ func TokenParserK8s(c *Client) TokenParser {
 }
 
 type Config struct {
-	Timeout time.Duration `split_words:"true" default:"10s"`
-	Addr    string        `split_words:"true" default:"http://localhost:8200"`
-	Role    string        `split_words:"true" default:"vault-auth"`
+	Timeout  time.Duration `split_words:"true" default:"10s"`
+	Addr     string        `split_words:"true" default:"http://localhost:8200"`
+	Role     string        `split_words:"true" default:"vault-auth"`
+	K8sMount string        `split_words:"true" default:"kubernetes"`
 }
 
 func NewClient(tokenAuthenticators ...TokenParser) (*Client, error) {
@@ -140,6 +142,7 @@ func NewClient(tokenAuthenticators ...TokenParser) (*Client, error) {
 		httpClient: httpClient,
 		vaultAddr:  config.Addr,
 		vaultRole:  config.Role,
+		vaultMount: config.K8sMount,
 	}
 
 	if len(tokenAuthenticators) == 0 {
