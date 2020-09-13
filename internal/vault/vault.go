@@ -14,6 +14,8 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"gitlab.unanet.io/devops/eve/pkg/errors"
 	ehttp "gitlab.unanet.io/devops/eve/pkg/http"
+	"gitlab.unanet.io/devops/eve/pkg/log"
+	"go.uber.org/zap"
 )
 
 type Secrets map[string]string
@@ -154,6 +156,7 @@ func getMap(data map[string]interface{}) map[string]string {
 }
 
 func (c *Client) getKvSecret(ctx context.Context, path string) (map[string]interface{}, error) {
+	log.Logger.Debug("vault get KvSecret", zap.String("path", path))
 	token, err := c.tokenParser(ctx)
 	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/v1/kv/data/%s", c.vaultAddr, path), nil)
 	if err != nil {
@@ -174,21 +177,21 @@ func (c *Client) getKvSecret(ctx context.Context, path string) (map[string]inter
 	}
 
 	if _, ok := respMap["data"]; !ok {
-		return nil, errors.Wrapf("/data property not found")
+		return nil, errors.Wrapf("vault respMap['data'] property not found")
 	}
 
 	data, ok := respMap["data"].(map[string]interface{})
 	if !ok {
-		return nil, errors.Wrapf("/data property not a map")
+		return nil, errors.Wrapf("vault respMap['data'].(map[string]interface{}) property not found")
 	}
 
 	if _, ok := data["data"]; !ok {
-		return nil, errors.Wrapf("/data/data property not found")
+		return nil, errors.Wrapf("vault data['data'] property not found")
 	}
 
 	data, ok = data["data"].(map[string]interface{})
 	if !ok {
-		return nil, errors.Wrapf("/data/data property not a map")
+		return nil, errors.Wrapf("vault data['data'].(map[string]interface{}) property not found")
 	}
 
 	return data, nil
