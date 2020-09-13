@@ -56,6 +56,7 @@ func (s *Scheduler) setSecrets(ctx context.Context, metadata map[string]interfac
 }
 
 func (s *Scheduler) triggerFunction(ctx context.Context, optName string, service *eve.DeployArtifact, plan *eve.NSDeploymentPlan) {
+	s.Logger(ctx).Debug("trigger function", zap.String("optName", optName))
 	fail := s.failAndLogFn(ctx, optName, service, plan)
 	payload := make(map[string]interface{})
 	for k, v := range service.Metadata {
