@@ -55,10 +55,11 @@ func (s *Scheduler) setSecrets(ctx context.Context, metadata map[string]interfac
 }
 
 func (s *Scheduler) triggerFunction(ctx context.Context, optName string, service *eve.DeployArtifact, plan *eve.NSDeploymentPlan) {
-	s.Logger(ctx).Debug("trigger function", zap.String("optName", optName))
+	s.Logger(ctx).Debug("trigger function", zap.String("optName", optName), zap.Any("service", &service), zap.Any("plan", &plan))
 	fail := s.failAndLogFn(ctx, optName, service, plan)
 	payload := make(map[string]interface{})
 	for k, v := range service.Metadata {
+		s.Logger(ctx).Debug("trigger function metadata", zap.String("index", k), zap.Any("v", v))
 		payload[k] = v
 	}
 	s.setSecrets(ctx, payload)
@@ -68,6 +69,7 @@ func (s *Scheduler) triggerFunction(ctx context.Context, optName string, service
 		return
 	}
 
+	s.Logger(ctx).Debug("trigger function payload", zap.Any("payload", payload))
 	resp, err := s.fnTrigger.Post(ctx, service.ArtifactFnPtr, fnCode, payload)
 	if err != nil {
 		fail(err, fmt.Sprintf("fnCode: %s trigger failed", fnCode))
