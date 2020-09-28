@@ -7,5 +7,6 @@ awsSecretAccessKey: ""
 vaultRole: ""
 vaultAddr: "http://vault.vault:8200"
 vaultK8sMount: "kubernetes"
+vaultK8sClusterName:
 serviceAccount: "eve-sch"
 image: "unanet-docker-prod.jfrog.io/ops/eve-sch-v1:0.1.0"
