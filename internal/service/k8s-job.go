@@ -34,10 +34,12 @@ func (s *Scheduler) runDockerJob(ctx context.Context, job *eve.DeployJob, plan *
 	fail := s.failAndLogFn(ctx, job.JobName, job.DeployArtifact, plan)
 
 	k8s, err := getK8sClient()
+
 	if err != nil {
 		fail(err, "an error occurred trying to get the k8s client")
 		return
 	}
+
 	labelSelector := fmt.Sprintf("job=%s", job.JobName)
 	imageName := getDockerImageName(job.DeployArtifact)
 	k8sJob := getK8sJob(
