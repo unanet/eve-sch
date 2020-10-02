@@ -198,10 +198,10 @@ func (s *Scheduler) setupLivelinessProbe(ctx context.Context, probeBytes []byte,
 }
 
 func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.DeployService, plan *eve.NSDeploymentPlan) {
-	fail := s.failAndLogFn(ctx, service.ServiceName, service.DeployArtifact, plan)
+	failNLog := s.failAndLogFn(ctx, service.ServiceName, service.DeployArtifact, plan)
 	k8s, err := getK8sClient()
 	if err != nil {
-		fail(err, "an error occurred trying to get the k8s client")
+		failNLog(err, "an error occurred trying to get the k8s client")
 		return
 	}
 	var instanceCount = service.Count
@@ -229,11 +229,11 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 				_, err := k8s.CoreV1().Services(plan.Namespace.Name).Create(ctx,
 					setupK8sService(service.ServiceName, plan.Namespace.Name, service.ServicePort, service.StickySessions), metav1.CreateOptions{})
 				if err != nil {
-					fail(err, "an error occurred trying to create the service")
+					failNLog(err, "an error occurred trying to create the service")
 					return
 				}
 			} else {
-				fail(err, "an error occurred trying to check for the service")
+				failNLog(err, "an error occurred trying to check for the service")
 				return
 			}
 		}
@@ -245,19 +245,19 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 			// This app hasn't been deployed yet so we need to deploy it
 			_, err := k8s.AppsV1().Deployments(plan.Namespace.Name).Create(ctx, deployment, metav1.CreateOptions{})
 			if err != nil {
-				fail(err, "an error occurred trying to create the deployment")
+				failNLog(err, "an error occurred trying to create the deployment")
 				return
 			}
 		} else {
 			// an error occurred trying to see if the app is already deployed
-			fail(err, "an error occurred trying to check for the deployment")
+			failNLog(err, "an error occurred trying to check for the deployment")
 			return
 		}
 	} else {
 		// we were able to retrieve the app which mean we need to run update instead of create
 		_, err := k8s.AppsV1().Deployments(plan.Namespace.Name).Update(ctx, deployment, metav1.UpdateOptions{})
 		if err != nil {
-			fail(err, "an error occurred trying to update the deployment")
+			failNLog(err, "an error occurred trying to update the deployment")
 			return
 		}
 	}
@@ -270,7 +270,7 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 		TimeoutSeconds: int64Ptr(config.GetConfig().K8sDeployTimeoutSec),
 	})
 	if err != nil {
-		fail(err, "an error occurred trying to watch the pods, deployment may have succeeded")
+		failNLog(err, "an error occurred trying to watch the pods, deployment may have succeeded")
 		return
 	}
 	started := make(map[string]bool)
@@ -285,6 +285,10 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 			continue
 		}
 		for _, x := range p.Status.ContainerStatuses {
+			if x.LastTerminationState.Terminated != nil {
+				failNLog(nil, "pod failed to start and returned a non zero exit code: %s", x.LastTerminationState.Terminated.ExitCode)
+				continue
+			}
 			if !*x.Started {
 				continue
 			}
@@ -302,12 +306,12 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 			LabelSelector: labelSelector,
 		})
 		if err != nil {
-			fail(nil, "an error occurred while trying to deploy: %s, timed out waiting for app to start.", service.ServiceName)
+			failNLog(nil, "an error occurred while trying to deploy: %s, timed out waiting for app to start.", service.ServiceName)
 			return
 		}
 
 		if len(pods.Items) != instanceCount {
-			fail(nil, "an error occurred while trying to deploy: %s, timed out waiting for app to start.", service.ServiceName)
+			failNLog(nil, "an error occurred while trying to deploy: %s, timed out waiting for app to start.", service.ServiceName)
 			return
 		}
 
@@ -319,7 +323,7 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 		}
 
 		if startedCount != instanceCount {
-			fail(nil, "an error occurred while trying to deploy: %s, timed out waiting for app to start.", service.ServiceName)
+			failNLog(nil, "an error occurred while trying to deploy: %s, timed out waiting for app to start.", service.ServiceName)
 			return
 		}
 	}

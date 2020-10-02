@@ -116,7 +116,6 @@ func (s *Scheduler) gracefulShutdown() {
 
 func (s *Scheduler) failAndLogFn(ctx context.Context, optName string, service *eve.DeployArtifact, plan *eve.NSDeploymentPlan) func(err error, format string, a ...interface{}) {
 	return func(err error, format string, a ...interface{}) {
-		s.Logger(ctx).Debug("scheduler fail and log", zap.Error(err))
 		if len(optName) == 0 {
 			format = format + " [artifact:%s]"
 			a = append(a, service.ArtifactName)
@@ -127,11 +126,12 @@ func (s *Scheduler) failAndLogFn(ctx context.Context, optName string, service *e
 
 		plan.Message(format, a...)
 		service.Result = eve.DeployArtifactResultFailed
-		if err == nil {
-			s.Logger(ctx).Error(fmt.Sprintf(format, a...), zap.String("artifact", service.ArtifactName), zap.String("deploy_name", optName))
-			return
+
+		if err != nil {
+			s.Logger(ctx).Error(fmt.Sprintf(format, a...), zap.String("artifact", service.ArtifactName), zap.String("deploy_name", optName), zap.Error(err))
+		} else {
+			s.Logger(ctx).Warn(fmt.Sprintf(format, a...), zap.String("artifact", service.ArtifactName), zap.String("deploy_name", optName))
 		}
-		s.Logger(ctx).Error(fmt.Sprintf(format, a...), zap.String("artifact", service.ArtifactName), zap.String("deploy_name", optName), zap.Error(err))
 	}
 }
 

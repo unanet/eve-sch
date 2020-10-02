@@ -26,7 +26,7 @@ type Config struct {
 	SchQWaitTimeSecond     int64         `split_words:"true" default:"20"`
 	SchQVisibilityTimeout  int64         `split_words:"true" default:"3600"`
 	SchQMaxNumberOfMessage int64         `split_words:"true" default:"5"`
-	SchQWorkerTimeout      time.Duration `split_words:"true" default:"600s"`
+	SchQWorkerTimeout      time.Duration `split_words:"true" default:"3500s"`
 	FnTriggerTimeout       time.Duration `split_words:"true" default:"300s"`
 	K8sDeployTimeoutSec    int64         `split_words:"true" default:"300"`
 	S3Bucket               string        `split_words:"true" required:"true"`
