@@ -286,7 +286,7 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 		}
 		for _, x := range p.Status.ContainerStatuses {
 			if x.LastTerminationState.Terminated != nil {
-				failNLog(nil, "pod failed to start and returned a non zero exit code: %s", x.LastTerminationState.Terminated.ExitCode)
+				failNLog(nil, "pod failed to start and returned a non zero exit code: %d", x.LastTerminationState.Terminated.ExitCode)
 				continue
 			}
 			if !*x.Started {
