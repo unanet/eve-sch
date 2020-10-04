@@ -356,7 +356,7 @@ func upsertDeployment(
 	service *eve.DeployService,
 	deployment *appsv1.Deployment,
 	plan *eve.NSDeploymentPlan,
-	fail func(err error, format string, a ...interface{}),
+	failNLog func(err error, format string, a ...interface{}),
 ) {
 
 	_, err := k8s.AppsV1().Deployments(plan.Namespace.Name).Get(ctx, service.ServiceName, metav1.GetOptions{})
@@ -365,19 +365,19 @@ func upsertDeployment(
 			// This app hasn't been deployed yet so we need to deploy it
 			_, err := k8s.AppsV1().Deployments(plan.Namespace.Name).Create(ctx, deployment, metav1.CreateOptions{})
 			if err != nil {
-				fail(err, "an error occurred trying to create the deployment")
+				failNLog(err, "an error occurred trying to create the deployment")
 				return
 			}
 		} else {
 			// an error occurred trying to see if the app is already deployed
-			fail(err, "an error occurred trying to check for the deployment")
+			failNLog(err, "an error occurred trying to check for the deployment")
 			return
 		}
 	} else {
 		// we were able to retrieve the app which mean we need to run update instead of create
 		_, err := k8s.AppsV1().Deployments(plan.Namespace.Name).Update(ctx, deployment, metav1.UpdateOptions{})
 		if err != nil {
-			fail(err, "an error occurred trying to update the deployment")
+			failNLog(err, "an error occurred trying to update the deployment")
 			return
 		}
 	}
@@ -389,7 +389,7 @@ func ensureServiceExists(
 	k8s *kubernetes.Clientset,
 	service *eve.DeployService,
 	plan *eve.NSDeploymentPlan,
-	fail func(err error, format string, a ...interface{}),
+	failNLog func(err error, format string, a ...interface{}),
 ) {
 
 	if service.ServicePort > 0 {
@@ -407,11 +407,11 @@ func ensureServiceExists(
 					metav1.CreateOptions{},
 				)
 				if err != nil {
-					fail(err, "an error occurred trying to create the service")
+					failNLog(err, "an error occurred trying to create the service")
 					return
 				}
 			} else {
-				fail(err, "an error occurred trying to check for the service")
+				failNLog(err, "an error occurred trying to check for the service")
 				return
 			}
 		}
@@ -453,7 +453,7 @@ func watchPodStatus(
 		}
 		for _, x := range p.Status.ContainerStatuses {
 			if x.LastTerminationState.Terminated != nil {
-				failNLog(nil, "pod failed to start and returned a non zero exit code: %s", x.LastTerminationState.Terminated.ExitCode)
+				failNLog(nil, "pod failed to start and returned a non zero exit code: %v", x.LastTerminationState.Terminated.ExitCode)
 				continue
 			}
 			if !*x.Started {
