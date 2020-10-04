@@ -257,15 +257,28 @@ func newK8sDeployment(opts ...K8sDeployOption) *appsv1.Deployment {
 	return d
 }
 
-// upsertDeployment will either create the initial K8s Deployment or Update and existing deployment
-func (s *Scheduler) upsertDeployment(
-	ctx context.Context,
-	k8s *kubernetes.Clientset,
-	service *eve.DeployService,
-	deployment *appsv1.Deployment,
-	plan *eve.NSDeploymentPlan,
-	failNLog func(err error, format string, a ...interface{}),
-) {
+// upsertDeployment will either create the initial K8s Deployment or Update an existing deployment
+func (s *Scheduler) upsertDeployment(ctx context.Context, k8s *kubernetes.Clientset, service *eve.DeployService, nuance string, plan *eve.NSDeploymentPlan, failNLog func(err error, format string, a ...interface{})) {
+
+	deployment := newK8sDeployment(
+		deploymentContainerOpt(
+			service.ServicePort,
+			service.MetricsPort,
+			service.ArtifactName,
+			getDockerImageName(service.DeployArtifact),
+			s.probeHelper(ctx, service.ReadinessProbe),
+			s.probeHelper(ctx, service.LivelinessProbe),
+			service.Metadata,
+		),
+		deploymentSelectorLabelsOpt(service.ServiceName),
+		deploymentLabelsOpt(service.ServiceName, service.AvailableVersion, nuance),
+		deploymentSecurityContextOpt(service.RunAs),
+		deploymentReplicasOpt(service.Count),
+		deploymentServiceAccountOpt(service.ServiceAccount),
+		deploymentNamespaceOpt(plan.Namespace.Name),
+		deploymentImagePullSecretsOpt(),
+		deploymentTerminationGracePeriodOpt(),
+	)
 
 	_, err := k8s.AppsV1().Deployments(plan.Namespace.Name).Get(ctx, service.ServiceName, metav1.GetOptions{})
 	if err != nil {
@@ -326,21 +339,23 @@ func (s *Scheduler) ensureServiceExists(
 	}
 }
 
+func labelSelectorHelper(svc *eve.DeployService, nuance string) string {
+	return fmt.Sprintf("app=%s,version=%s,nuance=%s", svc.ServiceName, svc.AvailableVersion, nuance)
+}
+
 func (s *Scheduler) watchPodStatus(
 	ctx context.Context,
 	k8s *kubernetes.Clientset,
 	service *eve.DeployService,
-	d *appsv1.Deployment,
+	nuance string,
 	plan *eve.NSDeploymentPlan,
 	failNLog func(err error, format string, a ...interface{}),
 ) {
 
-	var labelSelector = fmt.Sprintf("app=%s,version=%s,nuance=%s", service.ServiceName, service.AvailableVersion, d.Spec.Template.ObjectMeta.Labels["nuance"])
-
 	pods := k8s.CoreV1().Pods(plan.Namespace.Name)
 	podWatcher, err := pods.Watch(ctx, metav1.ListOptions{
 		TypeMeta:       metav1.TypeMeta{},
-		LabelSelector:  labelSelector,
+		LabelSelector:  labelSelectorHelper(service, nuance),
 		TimeoutSeconds: int64Ptr(config.GetConfig().K8sDeployTimeoutSec),
 	})
 	if err != nil {
@@ -377,7 +392,7 @@ func (s *Scheduler) watchPodStatus(
 
 	if len(started) != instanceCount {
 		// make sure we don't get a false positive and actually check
-		pods, err := k8s.CoreV1().Pods(plan.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
+		pods, err := k8s.CoreV1().Pods(plan.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: labelSelectorHelper(service, nuance)})
 		if err != nil {
 			failNLog(nil, "an error occurred while trying to deploy: %s, timed out waiting for app to start.", service.ServiceName)
 			return
@@ -404,31 +419,8 @@ func (s *Scheduler) watchPodStatus(
 
 func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.DeployService, plan *eve.NSDeploymentPlan) {
 	s.Logger(ctx).Debug("deploying docker service", zap.String("artifact_name", service.ArtifactName))
-	// Generate the K8s Deployment Resource
-	nuance := strconv.Itoa(int(time.Now().Unix()))
-	dockerImage := getDockerImageName(service.DeployArtifact)
 
-	deployment := newK8sDeployment(
-		deploymentContainerOpt(
-			service.ServicePort,
-			service.MetricsPort,
-			service.ArtifactName,
-			dockerImage,
-			s.probeHelper(ctx, service.ReadinessProbe),
-			s.probeHelper(ctx, service.LivelinessProbe),
-			service.Metadata,
-		),
-		deploymentSelectorLabelsOpt(service.ServiceName),
-		deploymentLabelsOpt(service.ServiceName, service.AvailableVersion, nuance),
-		deploymentSecurityContextOpt(service.RunAs),
-		deploymentReplicasOpt(service.Count),
-		deploymentServiceAccountOpt(service.ServiceAccount),
-		deploymentNamespaceOpt(plan.Namespace.Name),
-		deploymentImagePullSecretsOpt(),
-		deploymentTerminationGracePeriodOpt(),
-	)
-
-	// establish the failure handler function
+	// establish the failure handler func
 	failNLog := s.failAndLogFn(ctx, service.ServiceName, service.DeployArtifact, plan)
 
 	// get the k8s API Client
@@ -438,14 +430,30 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 		return
 	}
 
-	// ensure that the k8s service exists
+	if k8s == nil {
+		failNLog(nil, "nil k8s client")
+		return
+	}
+
+	if service == nil {
+		failNLog(nil, "nil eve deploy service")
+		return
+	}
+
+	if plan == nil {
+		failNLog(nil, "nil eve deploy plan")
+		return
+	}
+
+	// ensure the k8s service exists
 	s.ensureServiceExists(ctx, k8s, service, plan, failNLog)
 
+	nuance := strconv.Itoa(int(time.Now().Unix()))
 	// create or update the deployment
-	s.upsertDeployment(ctx, k8s, service, deployment, plan, failNLog)
+	s.upsertDeployment(ctx, k8s, service, nuance, plan, failNLog)
 
 	// watch pod status changes
-	s.watchPodStatus(ctx, k8s, service, deployment, plan, failNLog)
+	s.watchPodStatus(ctx, k8s, service, nuance, plan, failNLog)
 
 	// Return the successful result
 	service.Result = eve.DeployArtifactResultSuccess
