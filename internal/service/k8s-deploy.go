@@ -208,6 +208,9 @@ func DeploymentNuanceOpt(nuance string) K8sDeployOption {
 
 func DeploymentDockerCredsOpt(creds string) K8sDeployOption {
 	return func(d *appsv1.Deployment) {
+		if d.Spec.Template.Spec.ImagePullSecrets == nil {
+			d.Spec.Template.Spec.ImagePullSecrets = []apiv1.LocalObjectReference{}
+		}
 		d.Spec.Template.Spec.ImagePullSecrets[0].Name = creds
 	}
 }
@@ -264,18 +267,20 @@ func DeploymentEnvironmentVarsOpt(metadata map[string]interface{}) K8sDeployOpti
 		if d.Spec.Template.Spec.Containers == nil {
 			d.Spec.Template.Spec.Containers = initDeploymentContainers()
 		}
+		var containerEnvVars []apiv1.EnvVar
 
 		for k, v := range metadata {
 			value, ok := v.(string)
 			if !ok {
 				continue
 			}
-			d.Spec.Template.Spec.Containers[0].Env = append(d.Spec.Template.Spec.Containers[0].Env, apiv1.EnvVar{
+			containerEnvVars = append(containerEnvVars, apiv1.EnvVar{
 				Name:  k,
 				Value: value,
 			})
 		}
 
+		d.Spec.Template.Spec.Containers[0].Env = containerEnvVars
 	}
 }
 
