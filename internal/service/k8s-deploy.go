@@ -38,6 +38,7 @@ type k8sServiceOption func(*apiv1.Service)
 
 func svcNameOpt(serviceName string) k8sServiceOption {
 	return func(s *apiv1.Service) {
+		svcNilCheck(s)
 		s.ObjectMeta.Name = serviceName
 		if s.Spec.Selector == nil {
 			s.Spec.Selector = map[string]string{
@@ -51,6 +52,7 @@ func svcNameOpt(serviceName string) k8sServiceOption {
 
 func svcNamespaceOpt(ns string) k8sServiceOption {
 	return func(s *apiv1.Service) {
+		svcNilCheck(s)
 		s.ObjectMeta.Namespace = ns
 	}
 }
@@ -64,6 +66,7 @@ func svcPortOpt(port int) k8sServiceOption {
 				IntVal: int32(port),
 			},
 		}
+		svcNilCheck(s)
 		if s.Spec.Ports == nil {
 			s.Spec.Ports = []apiv1.ServicePort{svcPort}
 		} else {
@@ -75,9 +78,19 @@ func svcPortOpt(port int) k8sServiceOption {
 func svcStickySessionsOpt(stickySessions bool) k8sServiceOption {
 	return func(s *apiv1.Service) {
 		if stickySessions {
+			svcNilCheck(s)
 			s.Spec.SessionAffinity = apiv1.ServiceAffinityClientIP
 		}
 	}
+}
+
+func svcNilCheck(svc *apiv1.Service) *apiv1.Service {
+	if svc == nil {
+		return &apiv1.Service{}
+	} else {
+		return svc
+	}
+
 }
 
 func newK8sService(opts ...k8sServiceOption) *apiv1.Service {
@@ -96,6 +109,7 @@ func deploymentContainerOpt(
 	readinessProbe, livelinessProbe *apiv1.Probe,
 	metadata map[string]interface{}) K8sDeployOption {
 	return func(d *appsv1.Deployment) {
+		deploymentNilCheck(d)
 		containerPorts := []apiv1.ContainerPort{}
 		if appPort > 0 {
 			containerPorts = append(containerPorts, containerPortHelper("http", appPort, apiv1.ProtocolTCP))
@@ -148,12 +162,14 @@ func deploymentContainerOpt(
 
 func deploymentReplicasOpt(count int) K8sDeployOption {
 	return func(d *appsv1.Deployment) {
+		deploymentNilCheck(d)
 		d.Spec.Replicas = int32Ptr(count)
 	}
 }
 
 func deploymentSecurityContextOpt(runAs int) K8sDeployOption {
 	return func(d *appsv1.Deployment) {
+		deploymentNilCheck(d)
 		if d.Spec.Template.Spec.SecurityContext == nil {
 			d.Spec.Template.Spec.SecurityContext = &apiv1.PodSecurityContext{
 				RunAsGroup: int64Ptr(int64(runAs)),
@@ -171,12 +187,14 @@ func deploymentSecurityContextOpt(runAs int) K8sDeployOption {
 
 func deploymentServiceAccountOpt(sa string) K8sDeployOption {
 	return func(d *appsv1.Deployment) {
+		deploymentNilCheck(d)
 		d.Spec.Template.Spec.ServiceAccountName = sa
 	}
 }
 
 func deploymentLabelsOpt(name, version, nuance string) K8sDeployOption {
 	return func(d *appsv1.Deployment) {
+		deploymentNilCheck(d)
 		if d.Spec.Template.ObjectMeta.Labels == nil {
 			d.Spec.Template.ObjectMeta.Labels = map[string]string{
 				"app":     name,
@@ -191,8 +209,18 @@ func deploymentLabelsOpt(name, version, nuance string) K8sDeployOption {
 	}
 }
 
+func deploymentNilCheck(d *appsv1.Deployment) *appsv1.Deployment {
+	if d == nil {
+		return &appsv1.Deployment{}
+	} else {
+		return d
+	}
+
+}
+
 func deploymentSelectorLabelsOpt(name string) K8sDeployOption {
 	return func(d *appsv1.Deployment) {
+		deploymentNilCheck(d)
 		if d.Spec.Selector == nil {
 			d.Spec.Selector = &metav1.LabelSelector{
 				MatchLabels: map[string]string{
@@ -207,6 +235,7 @@ func deploymentSelectorLabelsOpt(name string) K8sDeployOption {
 
 func deploymentNamespaceOpt(ns string) K8sDeployOption {
 	return func(d *appsv1.Deployment) {
+		deploymentNilCheck(d)
 		d.ObjectMeta.Namespace = ns
 	}
 }
@@ -214,6 +243,7 @@ func deploymentNamespaceOpt(ns string) K8sDeployOption {
 func deploymentImagePullSecretsOpt() K8sDeployOption {
 	return func(d *appsv1.Deployment) {
 		dockerCreds := apiv1.LocalObjectReference{Name: dockerCreds}
+		deploymentNilCheck(d)
 		if d.Spec.Template.Spec.ImagePullSecrets == nil {
 			d.Spec.Template.Spec.ImagePullSecrets = []apiv1.LocalObjectReference{dockerCreds}
 		} else {
@@ -225,6 +255,7 @@ func deploymentImagePullSecretsOpt() K8sDeployOption {
 
 func deploymentTerminationGracePeriodOpt() K8sDeployOption {
 	return func(d *appsv1.Deployment) {
+		deploymentNilCheck(d)
 		d.Spec.Template.Spec.TerminationGracePeriodSeconds = int64Ptr(int64(terminationGracePeriodSecs))
 	}
 }
