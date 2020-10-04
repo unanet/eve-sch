@@ -193,11 +193,9 @@ func deploymentLabelsOpt(name, version, nuance string) K8sDeployOption {
 
 func deploymentSelectorLabelsOpt(name string) K8sDeployOption {
 	return func(d *appsv1.Deployment) {
-		if d.Spec.Selector == nil {
-			d.Spec.Selector = &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					"app": name,
-				},
+		if d.Spec.Selector.MatchLabels == nil {
+			d.Spec.Selector.MatchLabels = map[string]string{
+				"app": name,
 			}
 		} else {
 			d.Spec.Selector.MatchLabels["app"] = name
