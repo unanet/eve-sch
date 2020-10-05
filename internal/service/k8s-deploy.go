@@ -164,13 +164,11 @@ func setupMetrics(port int, deployment *appsv1.Deployment) {
 }
 
 func (s *Scheduler) setupResourceConstraints(ctx context.Context, resourceReqBytes, resourcelimitsBytes []byte, deployment *appsv1.Deployment) {
-	s.Logger(ctx).Warn("TROY resource requests", zap.ByteString("resourceReqBytes", resourceReqBytes), zap.ByteString("resourcelimitsBytes", resourcelimitsBytes))
 	if len(resourceReqBytes) < 5 {
 		return
 	}
 
 	var err error
-
 	var resourceReqs apiv1.ResourceList
 	err = json.Unmarshal(resourceReqBytes, &resourceReqs)
 	if err != nil {
@@ -189,15 +187,6 @@ func (s *Scheduler) setupResourceConstraints(ctx context.Context, resourceReqByt
 		Requests: resourceReqs,
 		Limits:   resourceLimits,
 	}
-
-	s.Logger(ctx).Warn("TROY resource requests", zap.Any("Resources", deployment.Spec.Template.Spec.Containers[0].Resources))
-
-	//deployment.Spec.Template.Spec.Containers[0].Resources = apiv1.ResourceRequirements{
-	//	Requests: apiv1.ResourceList{
-	//		"cpu":    resource.MustParse("0.25"),
-	//		"memory": resource.MustParse("10Mi"),
-	//}
-	//	},
 }
 
 func (s *Scheduler) setupReadinessProbe(ctx context.Context, probeBytes []byte, deployment *appsv1.Deployment) {
