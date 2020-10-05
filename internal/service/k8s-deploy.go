@@ -163,6 +163,49 @@ func setupMetrics(port int, deployment *appsv1.Deployment) {
 	deployment.Spec.Template.ObjectMeta.Annotations = annotations
 }
 
+func (s *Scheduler) setupResourceRequests(ctx context.Context, resourceReqBytes []byte, deployment *appsv1.Deployment) {
+	if len(resourceReqBytes) < 5 {
+		return
+	}
+
+	var resourceReqs apiv1.ResourceList
+	err := json.Unmarshal(resourceReqBytes, &resourceReqs)
+	if err != nil {
+		s.Logger(ctx).Warn("failed to unmarshal the resource requirement requests", zap.Error(err))
+		return
+	}
+	deployment.Spec.Template.Spec.Containers[0].Resources = apiv1.ResourceRequirements{Requests: resourceReqs}
+
+	//deployment.Spec.Template.Spec.Containers[0].Resources = apiv1.ResourceRequirements{
+	//	Requests: apiv1.ResourceList{
+	//		"cpu":    resource.MustParse("0.25"),
+	//		"memory": resource.MustParse("10Mi"),
+	//	},
+	//}
+}
+
+func (s *Scheduler) setupResourceLimits(ctx context.Context, resourcelimitsBytes []byte, deployment *appsv1.Deployment) {
+	if len(resourcelimitsBytes) < 5 {
+		return
+	}
+
+	var resourceLimits apiv1.ResourceList
+	err := json.Unmarshal(resourcelimitsBytes, &resourceLimits)
+	if err != nil {
+		s.Logger(ctx).Warn("failed to unmarshal the resource requirement limits", zap.Error(err))
+		return
+	}
+
+	deployment.Spec.Template.Spec.Containers[0].Resources = apiv1.ResourceRequirements{Limits: resourceLimits}
+
+	//deployment.Spec.Template.Spec.Containers[0].Resources = apiv1.ResourceRequirements{
+	//	Limits: apiv1.ResourceList{
+	//		"cpu":    resource.MustParse("0.5"),
+	//		"memory": resource.MustParse("15Mi"),
+	//	},
+	//}
+}
+
 func (s *Scheduler) setupReadinessProbe(ctx context.Context, probeBytes []byte, deployment *appsv1.Deployment) {
 	if len(probeBytes) < 5 {
 		return
@@ -221,6 +264,8 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 	setupPorts(service.ServicePort, service.MetricsPort, deployment)
 	s.setupLivelinessProbe(ctx, service.LivelinessProbe, deployment)
 	s.setupReadinessProbe(ctx, service.ReadinessProbe, deployment)
+	s.setupResourceLimits(ctx, service.ResourceLimits, deployment)
+	s.setupResourceRequests(ctx, service.ResourceRequests, deployment)
 
 	if service.ServicePort > 0 {
 		_, err := k8s.CoreV1().Services(plan.Namespace.Name).Get(ctx, service.ServiceName, metav1.GetOptions{})
