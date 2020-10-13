@@ -216,9 +216,9 @@ func setupK8sPodAutoScaling(serviceName, namespace string) *autoscaling.Horizont
 		},
 		Spec: autoscaling.HorizontalPodAutoscalerSpec{
 			ScaleTargetRef: autoscaling.CrossVersionObjectReference{
-				Kind: "Deployment",
-				Name: serviceName,
-				//APIVersion: "extensions/v1beta2",
+				Kind:       "Deployment",
+				Name:       serviceName,
+				APIVersion: "apps/v1",
 			},
 			MinReplicas: int32Ptr(minPodReplicas),
 			MaxReplicas: maxPodReplicas,
