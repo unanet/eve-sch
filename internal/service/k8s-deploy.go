@@ -436,22 +436,22 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 		_, err = k8s.AutoscalingV2beta2().HorizontalPodAutoscalers(plan.Namespace.Name).Get(ctx, service.ServiceName, apimachinerymetav1.GetOptions{})
 		if err != nil {
 			if k8sErrors.IsNotFound(err) {
-				_, err := k8s.AutoscalingV2beta2().HorizontalPodAutoscalers(plan.Namespace.Name).Create(ctx, k8sAutoScaler, apimachinerymetav1.CreateOptions{})
-				// an error occurred trying to see if the app is already deployed
-				failNLog(err, "an error occurred trying to create the autoscaler")
-				return
+				if _, err := k8s.AutoscalingV2beta2().HorizontalPodAutoscalers(plan.Namespace.Name).Create(ctx, k8sAutoScaler, apimachinerymetav1.CreateOptions{}); err != nil {
+					// an error occurred trying to see if the app is already deployed
+					failNLog(err, "an error occurred trying to create the autoscaler")
+					return
+				}
 			} else {
 				// an error occurred trying to see if the app is already deployed
 				failNLog(err, "an error occurred trying to get the autoscaler")
 				return
 			}
-		}
-
-		_, err = k8s.AutoscalingV2beta2().HorizontalPodAutoscalers(plan.Namespace.Name).Update(ctx, k8sAutoScaler, apimachinerymetav1.UpdateOptions{})
-		if err != nil {
-			// an error occurred trying to see if the app is already deployed
-			failNLog(err, "an error occurred trying to update the autoscaler")
-			return
+		} else {
+			if _, err = k8s.AutoscalingV2beta2().HorizontalPodAutoscalers(plan.Namespace.Name).Update(ctx, k8sAutoScaler, apimachinerymetav1.UpdateOptions{}); err != nil {
+				// an error occurred trying to see if the app is already deployed
+				failNLog(err, "an error occurred trying to update the autoscaler")
+				return
+			}
 		}
 	}
 
