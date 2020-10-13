@@ -453,7 +453,9 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 	if len(service.ResourceRequests) > 5 {
 		k8sAutoScaler := setupK8sPodAutoScaling(service.ServiceName, plan.Namespace.Name)
 
-		_, err = k8s.AutoscalingV2beta2().HorizontalPodAutoscalers(plan.Namespace.Name).Get(ctx, service.ServiceName, apimachinerymetav1.GetOptions{})
+		_, err = k8s.AutoscalingV2beta2().HorizontalPodAutoscalers(plan.Namespace.Name).Get(ctx, service.ServiceName, apimachinerymetav1.GetOptions{
+			TypeMeta: hpaMetaData,
+		})
 		if err != nil {
 			if k8sErrors.IsNotFound(err) {
 				if _, err := k8s.AutoscalingV2beta2().HorizontalPodAutoscalers(plan.Namespace.Name).Create(ctx, k8sAutoScaler, apimachinerymetav1.CreateOptions{}); err != nil {
@@ -469,9 +471,7 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 		}
 
 		if _, err = k8s.AutoscalingV2beta2().HorizontalPodAutoscalers(plan.Namespace.Name).Update(ctx, k8sAutoScaler, apimachinerymetav1.UpdateOptions{
-			TypeMeta:     metav1.TypeMeta{},
-			DryRun:       nil,
-			FieldManager: "",
+			TypeMeta: hpaMetaData,
 		}); err != nil {
 			// an error occurred trying to see if the app is already deployed
 			failNLog(err, "an error occurred trying to update the autoscaler")
