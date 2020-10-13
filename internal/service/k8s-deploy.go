@@ -40,6 +40,10 @@ func int64Ptr(i int64) *int64 { return &i }
 
 func setupK8sService(serviceName, namespace string, servicePort int, stickySessions bool) *apiv1.Service {
 	service := &apiv1.Service{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Service",
+			APIVersion: "apps/v1",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
 			Namespace: namespace,
@@ -77,6 +81,10 @@ func getK8sDeployment(
 	containerImage,
 	nuance string) *appsv1.Deployment {
 	return &appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: "apps/v1",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
 			Namespace: namespace,
