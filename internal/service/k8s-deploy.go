@@ -26,6 +26,23 @@ const (
 	DockerRepoFormat = "unanet-%s.jfrog.io"
 )
 
+var (
+	hpaMetaData = metav1.TypeMeta{
+		Kind:       "HorizontalPodAutoscaler",
+		APIVersion: "autoscaling/v2beta2",
+	}
+
+	serviceMetaData = metav1.TypeMeta{
+		Kind:       "Service",
+		APIVersion: "apps/v1",
+	}
+
+	deploymentMetaData = metav1.TypeMeta{
+		Kind:       "Deployment",
+		APIVersion: "apps/v1",
+	}
+)
+
 func int32Ptr(i int) *int32 {
 	i32 := int32(i)
 	return &i32
@@ -40,10 +57,7 @@ func int64Ptr(i int64) *int64 { return &i }
 
 func setupK8sService(serviceName, namespace string, servicePort int, stickySessions bool) *apiv1.Service {
 	service := &apiv1.Service{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Service",
-			APIVersion: "apps/v1",
-		},
+		TypeMeta: serviceMetaData,
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
 			Namespace: namespace,
@@ -81,10 +95,7 @@ func getK8sDeployment(
 	containerImage,
 	nuance string) *appsv1.Deployment {
 	return &appsv1.Deployment{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Deployment",
-			APIVersion: "apps/v1",
-		},
+		TypeMeta: deploymentMetaData,
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
 			Namespace: namespace,
@@ -218,6 +229,7 @@ const (
 
 func setupK8sPodAutoScaling(serviceName, namespace string) *autoscaling.HorizontalPodAutoscaler {
 	return &autoscaling.HorizontalPodAutoscaler{
+		TypeMeta: hpaMetaData,
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
 			Namespace: namespace,
@@ -454,13 +466,18 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 				failNLog(err, "an error occurred trying to get the autoscaler")
 				return
 			}
-		} else {
-			if _, err = k8s.AutoscalingV2beta2().HorizontalPodAutoscalers(plan.Namespace.Name).Update(ctx, k8sAutoScaler, apimachinerymetav1.UpdateOptions{}); err != nil {
-				// an error occurred trying to see if the app is already deployed
-				failNLog(err, "an error occurred trying to update the autoscaler")
-				return
-			}
 		}
+
+		if _, err = k8s.AutoscalingV2beta2().HorizontalPodAutoscalers(plan.Namespace.Name).Update(ctx, k8sAutoScaler, apimachinerymetav1.UpdateOptions{
+			TypeMeta:     metav1.TypeMeta{},
+			DryRun:       nil,
+			FieldManager: "",
+		}); err != nil {
+			// an error occurred trying to see if the app is already deployed
+			failNLog(err, "an error occurred trying to update the autoscaler")
+			return
+		}
+
 	}
 
 	service.Result = eve.DeployArtifactResultSuccess
