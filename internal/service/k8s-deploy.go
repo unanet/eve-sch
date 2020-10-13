@@ -237,7 +237,7 @@ func setupK8sPodAutoScaling(serviceName, namespace string) *autoscaling.Horizont
 						Name: "cpu",
 						Target: autoscaling.MetricTarget{
 							Type:               autoscaling.UtilizationMetricType,
-							AverageUtilization: int32Ptr(75),
+							AverageUtilization: int32Ptr(50),
 						},
 					},
 				},
@@ -247,7 +247,7 @@ func setupK8sPodAutoScaling(serviceName, namespace string) *autoscaling.Horizont
 						Name: "memory",
 						Target: autoscaling.MetricTarget{
 							Type:               autoscaling.UtilizationMetricType,
-							AverageUtilization: int32Ptr(75),
+							AverageUtilization: int32Ptr(50),
 						},
 					},
 				},
