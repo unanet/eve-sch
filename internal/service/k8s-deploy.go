@@ -8,15 +8,18 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/resource"
+
+	"gitlab.unanet.io/devops/eve-sch/internal/config"
 	"gitlab.unanet.io/devops/eve/pkg/eve"
 	"go.uber.org/zap"
 	appsv1 "k8s.io/api/apps/v1"
+	autoscaling "k8s.io/api/autoscaling/v2beta2"
 	apiv1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
+	apimachinerymetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-
-	"gitlab.unanet.io/devops/eve-sch/internal/config"
 )
 
 const (
@@ -26,6 +29,11 @@ const (
 func int32Ptr(i int) *int32 {
 	i32 := int32(i)
 	return &i32
+}
+
+func k8sResourceQuantityPtr(input string) *resource.Quantity {
+	var formattedVal = resource.MustParse(input)
+	return &formattedVal
 }
 
 func int64Ptr(i int64) *int64 { return &i }
@@ -164,28 +172,92 @@ func setupMetrics(port int, deployment *appsv1.Deployment) {
 }
 
 func (s *Scheduler) setupResourceConstraints(ctx context.Context, resourceReqBytes, resourcelimitsBytes []byte, deployment *appsv1.Deployment) {
-	if len(resourceReqBytes) < 5 {
+	if len(resourceReqBytes) < 5 && len(resourcelimitsBytes) < 5 {
 		return
 	}
 
 	var err error
-	var resourceReqs apiv1.ResourceList
-	err = json.Unmarshal(resourceReqBytes, &resourceReqs)
-	if err != nil {
-		s.Logger(ctx).Warn("failed to unmarshal the resource constraint requests", zap.Error(err))
-		return
+	var resourceRequirements apiv1.ResourceRequirements
+
+	if len(resourceReqBytes) > 5 {
+		var resourceReqs apiv1.ResourceList
+		err = json.Unmarshal(resourceReqBytes, &resourceReqs)
+		if err != nil {
+			s.Logger(ctx).Warn("failed to unmarshal the resource constraint requests", zap.Error(err))
+			return
+		}
+		resourceRequirements.Requests = resourceReqs
 	}
 
-	var resourceLimits apiv1.ResourceList
-	err = json.Unmarshal(resourcelimitsBytes, &resourceLimits)
-	if err != nil {
-		s.Logger(ctx).Warn("failed to unmarshal the resource constraint limits", zap.Error(err))
-		return
+	if len(resourcelimitsBytes) > 5 {
+		var resourceLimits apiv1.ResourceList
+		err = json.Unmarshal(resourcelimitsBytes, &resourceLimits)
+		if err != nil {
+			s.Logger(ctx).Warn("failed to unmarshal the resource constraint limits", zap.Error(err))
+			return
+		}
+		resourceRequirements.Limits = resourceLimits
 	}
 
-	deployment.Spec.Template.Spec.Containers[0].Resources = apiv1.ResourceRequirements{
-		Requests: resourceReqs,
-		Limits:   resourceLimits,
+	deployment.Spec.Template.Spec.Containers[0].Resources = resourceRequirements
+}
+
+// TODO: Should these be configurable in the DB???
+const (
+	minPodReplicas = 2
+	maxPodReplicas = 15
+)
+
+func setupK8sPodAutoScaling(serviceName, namespace string) *autoscaling.HorizontalPodAutoscaler {
+	return &autoscaling.HorizontalPodAutoscaler{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      serviceName,
+			Namespace: namespace,
+		},
+		Spec: autoscaling.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+				Kind:       "Deployment",
+				Name:       serviceName,
+				APIVersion: "extensions/v1beta2",
+			},
+			MinReplicas: int32Ptr(minPodReplicas),
+			MaxReplicas: maxPodReplicas,
+			Metrics: []autoscaling.MetricSpec{
+				{
+					Type: autoscaling.ResourceMetricSourceType,
+					Resource: &autoscaling.ResourceMetricSource{
+						Name: "cpu",
+						Target: autoscaling.MetricTarget{
+							Type:               autoscaling.UtilizationMetricType,
+							AverageUtilization: int32Ptr(50),
+						},
+					},
+				},
+				{
+					Type: autoscaling.ResourceMetricSourceType,
+					Resource: &autoscaling.ResourceMetricSource{
+						Name: "memory",
+						Target: autoscaling.MetricTarget{
+							Type:               autoscaling.UtilizationMetricType,
+							AverageUtilization: int32Ptr(50),
+						},
+					},
+				},
+			},
+			// Using the default for now.
+			//Behavior: &autoscaling.HorizontalPodAutoscalerBehavior{
+			//	ScaleUp: &autoscaling.HPAScalingRules{
+			//		StabilizationWindowSeconds: int32Ptr(300),
+			//		SelectPolicy:               nil,
+			//		Policies:                   nil,
+			//	},
+			//	ScaleDown: &autoscaling.HPAScalingRules{
+			//		StabilizationWindowSeconds: int32Ptr(300),
+			//		SelectPolicy:               nil,
+			//		Policies:                   nil,
+			//	},
+			//},
+		},
 	}
 }
 
@@ -270,7 +342,7 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 	if err != nil {
 		if k8sErrors.IsNotFound(err) {
 			// This app hasn't been deployed yet so we need to deploy it
-			_, err := k8s.AppsV1().Deployments(plan.Namespace.Name).Create(ctx, deployment, metav1.CreateOptions{})
+			_, err = k8s.AppsV1().Deployments(plan.Namespace.Name).Create(ctx, deployment, metav1.CreateOptions{})
 			if err != nil {
 				failNLog(err, "an error occurred trying to create the deployment")
 				return
@@ -282,7 +354,7 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 		}
 	} else {
 		// we were able to retrieve the app which mean we need to run update instead of create
-		_, err := k8s.AppsV1().Deployments(plan.Namespace.Name).Update(ctx, deployment, metav1.UpdateOptions{})
+		_, err = k8s.AppsV1().Deployments(plan.Namespace.Name).Update(ctx, deployment, metav1.UpdateOptions{})
 		if err != nil {
 			failNLog(err, "an error occurred trying to update the deployment")
 			return
@@ -355,5 +427,34 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 		}
 	}
 
+	// We only setup AutoScaling when the Resource Requests were supplied
+	// the autoscaler uses the requested resources to determine when to scale
+	// so if they aren't being used, we won't setup the autoscaler
+	if len(service.ResourceRequests) > 5 {
+		k8sAutoScaler := setupK8sPodAutoScaling(service.ServiceName, plan.Namespace.Name)
+
+		_, err = k8s.AutoscalingV2beta2().HorizontalPodAutoscalers(plan.Namespace.Name).Get(ctx, service.ServiceName, apimachinerymetav1.GetOptions{})
+		if err != nil {
+			if k8sErrors.IsNotFound(err) {
+				_, err := k8s.AutoscalingV2beta2().HorizontalPodAutoscalers(plan.Namespace.Name).Create(ctx, k8sAutoScaler, apimachinerymetav1.CreateOptions{})
+				// an error occurred trying to see if the app is already deployed
+				failNLog(err, "an error occurred trying to create the autoscaler")
+				return
+			} else {
+				// an error occurred trying to see if the app is already deployed
+				failNLog(err, "an error occurred trying to get the autoscaler")
+				return
+			}
+		}
+
+		_, err = k8s.AutoscalingV2beta2().HorizontalPodAutoscalers(plan.Namespace.Name).Update(ctx, k8sAutoScaler, apimachinerymetav1.UpdateOptions{})
+		if err != nil {
+			// an error occurred trying to see if the app is already deployed
+			failNLog(err, "an error occurred trying to update the autoscaler")
+			return
+		}
+	}
+
 	service.Result = eve.DeployArtifactResultSuccess
+
 }
