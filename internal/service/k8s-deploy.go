@@ -119,11 +119,6 @@ func (s *Scheduler) setupK8sDeployment(
 		// an error occurred trying to see if the app is already deployed
 		return errors.Wrap(err, "an error occurred trying to check for the deployment")
 	}
-	// Update an existing deployment
-	// TODO: Investigate this solution
-	// should we set the replica to the existing value
-	// or should we not set it at all...
-	// newDeployment.Spec.Replicas = existingDeployment.Spec.Replicas
 	// we were able to retrieve the app which mean we need to run update instead of create
 	_, err = k8s.AppsV1().Deployments(plan.Namespace.Name).Update(ctx, newDeployment, metav1.UpdateOptions{
 		TypeMeta: deploymentMetaData,
@@ -161,7 +156,7 @@ func (s *Scheduler) hydrateK8sDeployment(
 			Namespace: plan.Namespace.Name,
 		},
 		Spec: appsv1.DeploymentSpec{
-			//Replicas: int32Ptr(service.Count),
+			Replicas: int32Ptr(service.Count),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": service.ServiceName,
