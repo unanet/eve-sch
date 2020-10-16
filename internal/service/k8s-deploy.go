@@ -8,18 +8,16 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/resource"
+	"github.com/pkg/errors"
 
 	"gitlab.unanet.io/devops/eve-sch/internal/config"
 	"gitlab.unanet.io/devops/eve/pkg/eve"
 	"go.uber.org/zap"
 	appsv1 "k8s.io/api/apps/v1"
-	autoscaling "k8s.io/api/autoscaling/v2beta2"
 	apiv1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
-	apimachinerymetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/kubernetes"
 )
 
 const (
@@ -27,16 +25,6 @@ const (
 )
 
 var (
-	hpaMetaData = metav1.TypeMeta{
-		Kind:       "HorizontalPodAutoscaler",
-		APIVersion: "autoscaling/v2beta2",
-	}
-
-	serviceMetaData = metav1.TypeMeta{
-		Kind:       "Service",
-		APIVersion: "apps/v1",
-	}
-
 	deploymentMetaData = metav1.TypeMeta{
 		Kind:       "Deployment",
 		APIVersion: "apps/v1",
@@ -48,86 +36,145 @@ func int32Ptr(i int) *int32 {
 	return &i32
 }
 
-func k8sResourceQuantityPtr(input string) *resource.Quantity {
-	var formattedVal = resource.MustParse(input)
-	return &formattedVal
-}
-
 func int64Ptr(i int64) *int64 { return &i }
 
-func setupK8sService(serviceName, namespace string, servicePort int, stickySessions bool) *apiv1.Service {
-	service := &apiv1.Service{
-		TypeMeta: serviceMetaData,
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      serviceName,
-			Namespace: namespace,
-		},
-		Spec: apiv1.ServiceSpec{
-			Ports: []apiv1.ServicePort{
-				{
-					Port: int32(servicePort),
-					TargetPort: intstr.IntOrString{
-						Type:   intstr.Int,
-						IntVal: int32(servicePort),
-					},
-				},
-			},
-			Selector: map[string]string{
-				"app": serviceName,
-			},
-		},
+func containerEnvVars(metadata map[string]interface{}) []apiv1.EnvVar {
+	var containerEnvVars []apiv1.EnvVar
+	for k, v := range metadata {
+		value, ok := v.(string)
+		if !ok {
+			continue
+		}
+		containerEnvVars = append(containerEnvVars, apiv1.EnvVar{
+			Name:  k,
+			Value: value,
+		})
 	}
-
-	if stickySessions {
-		service.Spec.SessionAffinity = apiv1.ServiceAffinityClientIP
-	}
-
-	return service
+	return containerEnvVars
 }
 
-func getK8sDeployment(
-	instanceCount, runAs int,
-	serviceAccountName,
-	serviceName,
-	artifactName,
-	artifactVersion,
-	namespace,
-	containerImage,
-	nuance string) *appsv1.Deployment {
-	return &appsv1.Deployment{
+func deployAnnotations(port int) map[string]string {
+	if port == 0 {
+		return nil
+	}
+
+	return map[string]string{
+		"prometheus.io/scrape": "true",
+		"prometheus.io/port":   strconv.Itoa(port),
+	}
+}
+
+func (s *Scheduler) ParseResourceRequirements(ctx context.Context, input []byte) (apiv1.ResourceList, error) {
+	if len(input) == 0 {
+		return nil, nil
+	}
+	var result apiv1.ResourceList
+	if err := json.Unmarshal(input, &result); err != nil {
+		s.Logger(ctx).Warn("failed to unmarshal the resource requirement", zap.Error(err))
+		return nil, err
+	}
+	return result, nil
+}
+
+func (s *Scheduler) ParseProbe(ctx context.Context, input []byte) (*apiv1.Probe, error) {
+	var probe apiv1.Probe
+	if len(input) == 0 {
+		return nil, nil
+	}
+	if err := json.Unmarshal(input, &probe); err != nil {
+		s.Logger(ctx).Warn("failed to unmarshal the probe", zap.Error(err))
+		return nil, err
+	}
+	if probe.Handler.Exec == nil && probe.Handler.HTTPGet == nil && probe.Handler.TCPSocket == nil {
+		s.Logger(ctx).Warn("invalid readiness probe, the handler was not set")
+		return nil, fmt.Errorf("invalid probe")
+	}
+	return &probe, nil
+}
+
+func (s *Scheduler) setupK8sDeployment(
+	ctx context.Context,
+	k8s *kubernetes.Clientset,
+	plan *eve.NSDeploymentPlan,
+	service *eve.DeployService,
+	timeNuance string,
+) error {
+	deployment := s.hydrateK8sDeployment(ctx, plan, service, timeNuance)
+	_, err := k8s.AppsV1().Deployments(plan.Namespace.Name).Get(ctx, service.ServiceName, metav1.GetOptions{})
+	if err != nil {
+		if k8sErrors.IsNotFound(err) {
+			// This app hasn't been deployed yet so we need to deploy it
+			_, err = k8s.AppsV1().Deployments(plan.Namespace.Name).Create(ctx, deployment, metav1.CreateOptions{})
+			if err != nil {
+				return errors.Wrap(err, "an error occurred trying to create the deployment")
+			}
+		} else {
+			// an error occurred trying to see if the app is already deployed
+			return errors.Wrap(err, "an error occurred trying to check for the deployment")
+		}
+	} else {
+		// we were able to retrieve the app which mean we need to run update instead of create
+		_, err = k8s.AppsV1().Deployments(plan.Namespace.Name).Update(ctx, deployment, metav1.UpdateOptions{
+			TypeMeta: deploymentMetaData,
+		})
+		if err != nil {
+			return errors.Wrap(err, "an error occurred trying to update the deployment")
+		}
+	}
+	return nil
+}
+
+func labelSelector(service *eve.DeployService, timeNuance string) string {
+	return fmt.Sprintf("app=%s,version=%s,nuance=%s", service.ServiceName, service.AvailableVersion, timeNuance)
+}
+
+func matchLabels(service *eve.DeployService, timeNuance string) map[string]string {
+	return map[string]string{
+		"app":     service.ServiceName,
+		"version": service.AvailableVersion,
+		"nuance":  timeNuance,
+	}
+}
+
+func (s *Scheduler) hydrateK8sDeployment(
+	ctx context.Context,
+	plan *eve.NSDeploymentPlan,
+	service *eve.DeployService,
+	nuance string,
+) *appsv1.Deployment {
+
+	deployment := &appsv1.Deployment{
 		TypeMeta: deploymentMetaData,
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      serviceName,
-			Namespace: namespace,
+			Name:      service.ServiceName,
+			Namespace: plan.Namespace.Name,
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: int32Ptr(instanceCount),
+			Replicas: int32Ptr(service.Count),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"app": serviceName,
+					"app": service.ServiceName,
 				},
 			},
 			Template: apiv1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"app":     serviceName,
-						"version": artifactVersion,
-						"nuance":  nuance,
-					},
+					Labels:      matchLabels(service, nuance),
+					Annotations: deployAnnotations(service.MetricsPort),
 				},
 				Spec: apiv1.PodSpec{
 					SecurityContext: &apiv1.PodSecurityContext{
-						RunAsUser:  int64Ptr(int64(runAs)),
-						RunAsGroup: int64Ptr(int64(runAs)),
+						RunAsUser:  int64Ptr(int64(service.RunAs)),
+						RunAsGroup: int64Ptr(int64(service.RunAs)),
 						FSGroup:    int64Ptr(65534),
 					},
-					ServiceAccountName: serviceAccountName,
+					ServiceAccountName: service.ServiceAccount,
 					Containers: []apiv1.Container{
 						{
-							Name:            artifactName,
+							Name:            service.ArtifactName,
 							ImagePullPolicy: apiv1.PullAlways,
-							Image:           containerImage,
+							Image:           getDockerImageName(service.DeployArtifact),
 							Ports:           []apiv1.ContainerPort{},
+							Env:             containerEnvVars(service.Metadata),
 						},
 					},
 					TerminationGracePeriodSeconds: int64Ptr(300),
@@ -140,260 +187,70 @@ func getK8sDeployment(
 			},
 		},
 	}
-}
 
-func setupDeploymentEnvironment(metadata map[string]interface{}, deployment *appsv1.Deployment) {
-	var containerEnvVars []apiv1.EnvVar
-
-	for k, v := range metadata {
-		value, ok := v.(string)
-		if !ok {
-			continue
-		}
-		containerEnvVars = append(containerEnvVars, apiv1.EnvVar{
-			Name:  k,
-			Value: value,
-		})
-	}
-
-	deployment.Spec.Template.Spec.Containers[0].Env = containerEnvVars
-}
-
-func setupPorts(servicePort, metricsPort int, deployment *appsv1.Deployment) {
-	if servicePort != 0 {
+	// Setup the Service Port
+	if service.ServicePort != 0 {
 		deployment.Spec.Template.Spec.Containers[0].Ports = append(deployment.Spec.Template.Spec.Containers[0].Ports, apiv1.ContainerPort{
 			Name:          "http",
-			ContainerPort: int32(servicePort),
+			ContainerPort: int32(service.ServicePort),
 			Protocol:      apiv1.ProtocolTCP,
 		})
 	}
-
-	if metricsPort != 0 {
+	// Setup the Metrics Port
+	if service.MetricsPort != 0 {
 		deployment.Spec.Template.Spec.Containers[0].Ports = append(deployment.Spec.Template.Spec.Containers[0].Ports, apiv1.ContainerPort{
 			Name:          "metrics",
-			ContainerPort: int32(metricsPort),
+			ContainerPort: int32(service.MetricsPort),
 			Protocol:      apiv1.ProtocolTCP,
 		})
 	}
-}
 
-func setupMetrics(port int, deployment *appsv1.Deployment) {
-	if port == 0 {
-		return
+	// Setup the Probes
+	if probe, err := s.ParseProbe(ctx, service.ReadinessProbe); err == nil && probe != nil {
+		deployment.Spec.Template.Spec.Containers[0].ReadinessProbe = probe
+	}
+	if probe, err := s.ParseProbe(ctx, service.LivelinessProbe); err == nil && probe != nil {
+		deployment.Spec.Template.Spec.Containers[0].LivenessProbe = probe
 	}
 
-	annotations := map[string]string{
-		"prometheus.io/scrape": "true",
-		"prometheus.io/port":   strconv.Itoa(port),
-	}
-
-	deployment.Spec.Template.ObjectMeta.Annotations = annotations
-}
-
-func (s *Scheduler) setupResourceConstraints(ctx context.Context, resourceReqBytes, resourcelimitsBytes []byte, deployment *appsv1.Deployment) {
-	if len(resourceReqBytes) < 5 && len(resourcelimitsBytes) < 5 {
-		return
-	}
-
-	var err error
+	// Setup the Resource Constraints
 	var resourceRequirements apiv1.ResourceRequirements
 
-	if len(resourceReqBytes) > 5 {
-		var resourceReqs apiv1.ResourceList
-		err = json.Unmarshal(resourceReqBytes, &resourceReqs)
-		if err != nil {
-			s.Logger(ctx).Warn("failed to unmarshal the resource constraint requests", zap.Error(err))
-			return
-		}
+	if resourceReqs, err := s.ParseResourceRequirements(ctx, service.ResourceRequests); err == nil && resourceReqs != nil {
 		resourceRequirements.Requests = resourceReqs
 	}
 
-	if len(resourcelimitsBytes) > 5 {
-		var resourceLimits apiv1.ResourceList
-		err = json.Unmarshal(resourcelimitsBytes, &resourceLimits)
-		if err != nil {
-			s.Logger(ctx).Warn("failed to unmarshal the resource constraint limits", zap.Error(err))
-			return
-		}
+	if resourceLimits, err := s.ParseResourceRequirements(ctx, service.ResourceLimits); err == nil && resourceLimits != nil {
 		resourceRequirements.Limits = resourceLimits
 	}
 
-	deployment.Spec.Template.Spec.Containers[0].Resources = resourceRequirements
+	if resourceRequirements.Requests != nil || resourceRequirements.Limits != nil {
+		deployment.Spec.Template.Spec.Containers[0].Resources = resourceRequirements
+	}
+
+	return deployment
 }
 
-// TODO: Should these be configurable in the DB???
-const (
-	minPodReplicas = 2
-	maxPodReplicas = 15
-)
-
-func setupK8sPodAutoScaling(serviceName, namespace string) *autoscaling.HorizontalPodAutoscaler {
-	return &autoscaling.HorizontalPodAutoscaler{
-		TypeMeta: hpaMetaData,
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      serviceName,
-			Namespace: namespace,
-		},
-		Spec: autoscaling.HorizontalPodAutoscalerSpec{
-			ScaleTargetRef: autoscaling.CrossVersionObjectReference{
-				Kind:       "Deployment",
-				Name:       serviceName,
-				APIVersion: "apps/v1",
-			},
-			MinReplicas: int32Ptr(minPodReplicas),
-			MaxReplicas: maxPodReplicas,
-			Metrics: []autoscaling.MetricSpec{
-				{
-					Type: autoscaling.ResourceMetricSourceType,
-					Resource: &autoscaling.ResourceMetricSource{
-						Name: "cpu",
-						Target: autoscaling.MetricTarget{
-							Type:               autoscaling.UtilizationMetricType,
-							AverageUtilization: int32Ptr(110),
-						},
-					},
-				},
-				{
-					Type: autoscaling.ResourceMetricSourceType,
-					Resource: &autoscaling.ResourceMetricSource{
-						Name: "memory",
-						Target: autoscaling.MetricTarget{
-							Type:               autoscaling.UtilizationMetricType,
-							AverageUtilization: int32Ptr(110),
-						},
-					},
-				},
-			},
-			// Using the default for now.
-			//Behavior: &autoscaling.HorizontalPodAutoscalerBehavior{
-			//	ScaleUp: &autoscaling.HPAScalingRules{
-			//		StabilizationWindowSeconds: int32Ptr(300),
-			//		SelectPolicy:               nil,
-			//		Policies:                   nil,
-			//	},
-			//	ScaleDown: &autoscaling.HPAScalingRules{
-			//		StabilizationWindowSeconds: int32Ptr(300),
-			//		SelectPolicy:               nil,
-			//		Policies:                   nil,
-			//	},
-			//},
-		},
-	}
-}
-
-func (s *Scheduler) setupReadinessProbe(ctx context.Context, probeBytes []byte, deployment *appsv1.Deployment) {
-	if len(probeBytes) < 5 {
-		return
-	}
-	var probe apiv1.Probe
-	err := json.Unmarshal(probeBytes, &probe)
-	if err != nil {
-		s.Logger(ctx).Warn("failed to unmarshal the readiness probe", zap.Error(err))
-		return
-	}
-	if probe.Handler.Exec == nil && probe.Handler.HTTPGet == nil && probe.Handler.TCPSocket == nil {
-		s.Logger(ctx).Warn("invalid readiness probe, the handler was not set")
-		return
-	}
-	deployment.Spec.Template.Spec.Containers[0].ReadinessProbe = &probe
-}
-
-func (s *Scheduler) setupLivelinessProbe(ctx context.Context, probeBytes []byte, deployment *appsv1.Deployment) {
-	if len(probeBytes) < 5 {
-		return
-	}
-	var probe apiv1.Probe
-	err := json.Unmarshal(probeBytes, &probe)
-	if err != nil {
-		s.Logger(ctx).Warn("failed to unmarshal the liveliness probe", zap.Error(err))
-		return
-	}
-	if probe.Handler.Exec == nil && probe.Handler.HTTPGet == nil && probe.Handler.TCPSocket == nil {
-		s.Logger(ctx).Warn("invalid liveliness probe, the handler was not set")
-		return
-	}
-	deployment.Spec.Template.Spec.Containers[0].LivenessProbe = &probe
-}
-
-func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.DeployService, plan *eve.NSDeploymentPlan) {
+func (s *Scheduler) watchPods(
+	ctx context.Context,
+	k8s *kubernetes.Clientset,
+	plan *eve.NSDeploymentPlan,
+	service *eve.DeployService,
+	timeNuance string,
+) error {
 	failNLog := s.failAndLogFn(ctx, service.ServiceName, service.DeployArtifact, plan)
-	k8s, err := getK8sClient()
-	if err != nil {
-		failNLog(err, "an error occurred trying to get the k8s client")
-		return
-	}
-	var instanceCount = service.Count
-	timeNuance := strconv.Itoa(int(time.Now().Unix()))
-	imageName := getDockerImageName(service.DeployArtifact)
-	deployment := getK8sDeployment(
-		instanceCount, service.RunAs,
-		service.ServiceAccount,
-		service.ServiceName,
-		service.ArtifactName,
-		service.AvailableVersion,
-		plan.Namespace.Name,
-		imageName,
-		timeNuance)
-	setupDeploymentEnvironment(service.Metadata, deployment)
-	setupMetrics(service.MetricsPort, deployment)
-	setupPorts(service.ServicePort, service.MetricsPort, deployment)
-	s.setupLivelinessProbe(ctx, service.LivelinessProbe, deployment)
-	s.setupReadinessProbe(ctx, service.ReadinessProbe, deployment)
-	s.setupResourceConstraints(ctx, service.ResourceRequests, service.ResourceLimits, deployment)
-
-	if service.ServicePort > 0 {
-		_, err := k8s.CoreV1().Services(plan.Namespace.Name).Get(ctx, service.ServiceName, metav1.GetOptions{})
-		if err != nil {
-			if k8sErrors.IsNotFound(err) {
-				_, err := k8s.CoreV1().Services(plan.Namespace.Name).Create(ctx,
-					setupK8sService(service.ServiceName, plan.Namespace.Name, service.ServicePort, service.StickySessions), metav1.CreateOptions{})
-				if err != nil {
-					failNLog(err, "an error occurred trying to create the service")
-					return
-				}
-			} else {
-				failNLog(err, "an error occurred trying to check for the service")
-				return
-			}
-		}
-	}
-
-	_, err = k8s.AppsV1().Deployments(plan.Namespace.Name).Get(ctx, service.ServiceName, metav1.GetOptions{})
-	if err != nil {
-		if k8sErrors.IsNotFound(err) {
-			// This app hasn't been deployed yet so we need to deploy it
-			_, err = k8s.AppsV1().Deployments(plan.Namespace.Name).Create(ctx, deployment, metav1.CreateOptions{})
-			if err != nil {
-				failNLog(err, "an error occurred trying to create the deployment")
-				return
-			}
-		} else {
-			// an error occurred trying to see if the app is already deployed
-			failNLog(err, "an error occurred trying to check for the deployment")
-			return
-		}
-	} else {
-		// we were able to retrieve the app which mean we need to run update instead of create
-		_, err = k8s.AppsV1().Deployments(plan.Namespace.Name).Update(ctx, deployment, metav1.UpdateOptions{})
-		if err != nil {
-			failNLog(err, "an error occurred trying to update the deployment")
-			return
-		}
-	}
-
-	labelSelector := fmt.Sprintf("app=%s,version=%s,nuance=%s", service.ServiceName, service.AvailableVersion, timeNuance)
 	pods := k8s.CoreV1().Pods(plan.Namespace.Name)
 	watch, err := pods.Watch(ctx, metav1.ListOptions{
 		TypeMeta:       metav1.TypeMeta{},
-		LabelSelector:  labelSelector,
+		LabelSelector:  labelSelector(service, timeNuance),
 		TimeoutSeconds: int64Ptr(config.GetConfig().K8sDeployTimeoutSec),
 	})
 	if err != nil {
-		failNLog(err, "an error occurred trying to watch the pods, deployment may have succeeded")
-		return
+		return errors.Wrap(err, "an error occurred trying to watch the pods, deployment may have succeeded")
 	}
 	started := make(map[string]bool)
 
+	var instanceCount = service.Count
 	if strings.HasPrefix(service.ServiceName, "eve-sch") {
 		instanceCount = 1
 	}
@@ -406,8 +263,7 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 		for _, x := range p.Status.ContainerStatuses {
 			if x.LastTerminationState.Terminated != nil {
 				failNLog(nil, "pod failed to start and returned a non zero exit code: %d", x.LastTerminationState.Terminated.ExitCode)
-				watch.Stop()
-				return
+				continue
 			}
 			if !*x.Started {
 				continue
@@ -423,16 +279,14 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 	if len(started) != instanceCount {
 		// make sure we don't get a false positive and actually check
 		pods, err := k8s.CoreV1().Pods(plan.Namespace.Name).List(ctx, metav1.ListOptions{
-			LabelSelector: labelSelector,
+			LabelSelector: labelSelector(service, timeNuance),
 		})
 		if err != nil {
-			failNLog(nil, "an error occurred while trying to deploy: %s, timed out waiting for app to start.", service.ServiceName)
-			return
+			return errors.Wrap(err, fmt.Sprintf("an error occurred while trying to deploy: %s, timed out waiting for app to start", service.ServiceName))
 		}
 
 		if len(pods.Items) != instanceCount {
-			failNLog(nil, "an error occurred while trying to deploy: %s, timed out waiting for app to start.", service.ServiceName)
-			return
+			return fmt.Errorf("an error occurred while trying to deploy: %s, pods != count", service.ServiceName)
 		}
 
 		var startedCount int
@@ -443,44 +297,36 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 		}
 
 		if startedCount != instanceCount {
-			failNLog(nil, "an error occurred while trying to deploy: %s, timed out waiting for app to start.", service.ServiceName)
-			return
+			return fmt.Errorf("an error occurred while trying to deploy: %s, started != count", service.ServiceName)
 		}
 	}
+	return nil
+}
 
-	// We only setup AutoScaling when the Resource Requests were supplied
-	// the autoscaler uses the requested resources to determine when to scale
-	// so if they aren't being used, we won't setup the autoscaler
-	if len(service.ResourceRequests) > 5 {
-		k8sAutoScaler := setupK8sPodAutoScaling(service.ServiceName, plan.Namespace.Name)
-
-		_, err = k8s.AutoscalingV2beta2().HorizontalPodAutoscalers(plan.Namespace.Name).Get(ctx, service.ServiceName, apimachinerymetav1.GetOptions{
-			TypeMeta: hpaMetaData,
-		})
-		if err != nil {
-			if k8sErrors.IsNotFound(err) {
-				if _, err := k8s.AutoscalingV2beta2().HorizontalPodAutoscalers(plan.Namespace.Name).Create(ctx, k8sAutoScaler, apimachinerymetav1.CreateOptions{}); err != nil {
-					// an error occurred trying to see if the app is already deployed
-					failNLog(err, "an error occurred trying to create the autoscaler")
-					return
-				}
-			} else {
-				// an error occurred trying to see if the app is already deployed
-				failNLog(err, "an error occurred trying to get the autoscaler")
-				return
-			}
-		}
-
-		if _, err = k8s.AutoscalingV2beta2().HorizontalPodAutoscalers(plan.Namespace.Name).Update(ctx, k8sAutoScaler, apimachinerymetav1.UpdateOptions{
-			TypeMeta: hpaMetaData,
-		}); err != nil {
-			// an error occurred trying to see if the app is already deployed
-			failNLog(err, "an error occurred trying to update the autoscaler")
-			return
-		}
-
+func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.DeployService, plan *eve.NSDeploymentPlan) {
+	failNLog := s.failAndLogFn(ctx, service.ServiceName, service.DeployArtifact, plan)
+	k8s, err := getK8sClient()
+	if err != nil {
+		failNLog(err, "an error occurred trying to get the k8s client")
+		return
 	}
 
+	timeNuance := strconv.Itoa(int(time.Now().Unix()))
+	if err := s.setupK8sService(ctx, k8s, plan, service); err != nil {
+		failNLog(err, "an error occurred setting up the k8s service")
+		return
+	}
+	if err := s.setupK8sDeployment(ctx, k8s, plan, service, timeNuance); err != nil {
+		failNLog(err, "an error occurred setting up the k8s deployment")
+		return
+	}
+	if err := s.watchPods(ctx, k8s, plan, service, timeNuance); err != nil {
+		failNLog(err, "an error occurred while watching k8s pods")
+		return
+	}
+	if err := s.setupK8sAutoscaler(ctx, k8s, plan, service); err != nil {
+		failNLog(err, "an error occurred while setting up k8s pod autoscaler")
+		return
+	}
 	service.Result = eve.DeployArtifactResultSuccess
-
 }
