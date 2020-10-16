@@ -106,7 +106,7 @@ func (s *Scheduler) setupK8sDeployment(
 	timeNuance string,
 ) error {
 	newDeployment := s.hydrateK8sDeployment(ctx, plan, service, timeNuance)
-	existingDeployment, err := k8s.AppsV1().Deployments(plan.Namespace.Name).Get(ctx, service.ServiceName, metav1.GetOptions{})
+	_, err := k8s.AppsV1().Deployments(plan.Namespace.Name).Get(ctx, service.ServiceName, metav1.GetOptions{})
 	if err != nil {
 		if k8sErrors.IsNotFound(err) {
 			// This app hasn't been deployed yet so we need to deploy it
@@ -123,7 +123,7 @@ func (s *Scheduler) setupK8sDeployment(
 	// TODO: Investigate this solution
 	// should we set the replica to the existing value
 	// or should we not set it at all...
-	newDeployment.Spec.Replicas = existingDeployment.Spec.Replicas
+	// newDeployment.Spec.Replicas = existingDeployment.Spec.Replicas
 	// we were able to retrieve the app which mean we need to run update instead of create
 	_, err = k8s.AppsV1().Deployments(plan.Namespace.Name).Update(ctx, newDeployment, metav1.UpdateOptions{
 		TypeMeta: deploymentMetaData,
@@ -161,7 +161,7 @@ func (s *Scheduler) hydrateK8sDeployment(
 			Namespace: plan.Namespace.Name,
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: int32Ptr(service.Count),
+			//Replicas: int32Ptr(service.Count),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": service.ServiceName,
