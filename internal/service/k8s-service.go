@@ -68,13 +68,6 @@ func (s *Scheduler) setupK8sService(
 			} else {
 				return errors.Wrap(err, "an error occurred trying to check for the service")
 			}
-		} else {
-			_, err := k8s.CoreV1().Services(plan.Namespace.Name).Update(ctx, k8sSvc, metav1.UpdateOptions{
-				TypeMeta: serviceMetaData,
-			})
-			if err != nil {
-				return errors.Wrap(err, "an error occurred trying to update the service")
-			}
 		}
 	}
 	return nil

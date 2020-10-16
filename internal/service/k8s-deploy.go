@@ -65,7 +65,7 @@ func deployAnnotations(port int) map[string]string {
 }
 
 func (s *Scheduler) ParseResourceRequirements(ctx context.Context, input []byte) (apiv1.ResourceList, error) {
-	if len(input) == 0 {
+	if len(input) <= 5 {
 		return nil, nil
 	}
 	var result apiv1.ResourceList
@@ -77,10 +77,10 @@ func (s *Scheduler) ParseResourceRequirements(ctx context.Context, input []byte)
 }
 
 func (s *Scheduler) ParseProbe(ctx context.Context, input []byte) (*apiv1.Probe, error) {
-	var probe apiv1.Probe
-	if len(input) == 0 {
+	if len(input) <= 5 {
 		return nil, nil
 	}
+	var probe apiv1.Probe
 	if err := json.Unmarshal(input, &probe); err != nil {
 		s.Logger(ctx).Warn("failed to unmarshal the probe", zap.Error(err))
 		return nil, err
