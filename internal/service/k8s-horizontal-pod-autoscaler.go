@@ -128,6 +128,8 @@ func (s *Scheduler) setupK8sAutoscaler(
 		return nil
 	}
 
+	s.Logger(ctx).Debug("setup k8s autoscaler", zap.Any("service", service), zap.Any("plan", plan))
+
 	k8sAutoScaler, err := s.hydrateK8sPodAutoScaling(ctx, service, plan)
 	if err != nil {
 		return errors.Wrap(err, "an error occurred trying to hydrate the k8s autoscaler object")
