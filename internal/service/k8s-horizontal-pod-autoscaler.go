@@ -35,19 +35,6 @@ func (s *Scheduler) parseUtilizationLimits(ctx context.Context, input []byte) (*
 	return &utilLimits, nil
 }
 
-func (s *Scheduler) parseReplicaLimits(ctx context.Context, input []byte) (*eve.ReplicaLimits, error) {
-	if len(input) <= 5 {
-		s.Logger(ctx).Debug("not setting replication limit", zap.ByteString("replication_limit", input))
-		return nil, nil
-	}
-	var replicaLimits eve.ReplicaLimits
-	if err := json.Unmarshal(input, &replicaLimits); err != nil {
-		s.Logger(ctx).Warn("failed to unmarshal the replication limit bytes", zap.ByteString("replication_limit", input), zap.Error(err))
-		return nil, err
-	}
-	return &replicaLimits, nil
-}
-
 func (s *Scheduler) hydrateK8sPodAutoScaling(ctx context.Context, service *eve.DeployService, plan *eve.NSDeploymentPlan) (*autoscaling.HorizontalPodAutoscaler, error) {
 
 	utilLimits, err := s.parseUtilizationLimits(ctx, service.UtilizationLimits)
@@ -56,15 +43,6 @@ func (s *Scheduler) hydrateK8sPodAutoScaling(ctx context.Context, service *eve.D
 	}
 	if utilLimits == nil {
 		s.Logger(ctx).Debug("nil utilization limit")
-		return nil, nil
-	}
-
-	replicaLimits, err := s.parseReplicaLimits(ctx, service.ReplicaLimits)
-	if err != nil {
-		return nil, err
-	}
-	if replicaLimits == nil {
-		s.Logger(ctx).Debug("nil replication limit")
 		return nil, nil
 	}
 
@@ -80,8 +58,8 @@ func (s *Scheduler) hydrateK8sPodAutoScaling(ctx context.Context, service *eve.D
 				Name:       service.ServiceName,
 				APIVersion: "apps/v1",
 			},
-			MinReplicas: int32Ptr(replicaLimits.Min),
-			MaxReplicas: int32(replicaLimits.Max),
+			MinReplicas: int32Ptr(service.MinPod),
+			MaxReplicas: int32(service.MaxPod),
 			Metrics: []autoscaling.MetricSpec{
 				{
 					Type: autoscaling.ResourceMetricSourceType,
