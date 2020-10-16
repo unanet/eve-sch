@@ -29,6 +29,12 @@ var (
 		Kind:       "Deployment",
 		APIVersion: "apps/v1",
 	}
+
+	k8sDockerSecret = apiv1.LocalObjectReference{
+		Name: "docker-cfg",
+	}
+
+	imagePullSecrets = []apiv1.LocalObjectReference{k8sDockerSecret}
 )
 
 func int32Ptr(i int) *int32 {
@@ -99,28 +105,33 @@ func (s *Scheduler) setupK8sDeployment(
 	service *eve.DeployService,
 	timeNuance string,
 ) error {
-	deployment := s.hydrateK8sDeployment(ctx, plan, service, timeNuance)
-	_, err := k8s.AppsV1().Deployments(plan.Namespace.Name).Get(ctx, service.ServiceName, metav1.GetOptions{})
+	newDeployment := s.hydrateK8sDeployment(ctx, plan, service, timeNuance)
+	existingDeployment, err := k8s.AppsV1().Deployments(plan.Namespace.Name).Get(ctx, service.ServiceName, metav1.GetOptions{})
 	if err != nil {
 		if k8sErrors.IsNotFound(err) {
 			// This app hasn't been deployed yet so we need to deploy it
-			_, err = k8s.AppsV1().Deployments(plan.Namespace.Name).Create(ctx, deployment, metav1.CreateOptions{})
+			_, err = k8s.AppsV1().Deployments(plan.Namespace.Name).Create(ctx, newDeployment, metav1.CreateOptions{})
 			if err != nil {
 				return errors.Wrap(err, "an error occurred trying to create the deployment")
 			}
-		} else {
-			// an error occurred trying to see if the app is already deployed
-			return errors.Wrap(err, "an error occurred trying to check for the deployment")
+			return nil
 		}
-	} else {
-		// we were able to retrieve the app which mean we need to run update instead of create
-		_, err = k8s.AppsV1().Deployments(plan.Namespace.Name).Update(ctx, deployment, metav1.UpdateOptions{
-			TypeMeta: deploymentMetaData,
-		})
-		if err != nil {
-			return errors.Wrap(err, "an error occurred trying to update the deployment")
-		}
+		// an error occurred trying to see if the app is already deployed
+		return errors.Wrap(err, "an error occurred trying to check for the deployment")
 	}
+	// Update an existing deployment
+	// TODO: Investigate this solution
+	// should we set the replica to the existing value
+	// or should we not set it at all...
+	newDeployment.Spec.Replicas = existingDeployment.Spec.Replicas
+	// we were able to retrieve the app which mean we need to run update instead of create
+	_, err = k8s.AppsV1().Deployments(plan.Namespace.Name).Update(ctx, newDeployment, metav1.UpdateOptions{
+		TypeMeta: deploymentMetaData,
+	})
+	if err != nil {
+		return errors.Wrap(err, "an error occurred trying to update the deployment")
+	}
+
 	return nil
 }
 
@@ -173,36 +184,15 @@ func (s *Scheduler) hydrateK8sDeployment(
 							Name:            service.ArtifactName,
 							ImagePullPolicy: apiv1.PullAlways,
 							Image:           getDockerImageName(service.DeployArtifact),
-							Ports:           []apiv1.ContainerPort{},
+							Ports:           getContainerPorts(service),
 							Env:             containerEnvVars(service.Metadata),
 						},
 					},
 					TerminationGracePeriodSeconds: int64Ptr(300),
-					ImagePullSecrets: []apiv1.LocalObjectReference{
-						{
-							Name: "docker-cfg",
-						},
-					},
+					ImagePullSecrets:              imagePullSecrets,
 				},
 			},
 		},
-	}
-
-	// Setup the Service Port
-	if service.ServicePort != 0 {
-		deployment.Spec.Template.Spec.Containers[0].Ports = append(deployment.Spec.Template.Spec.Containers[0].Ports, apiv1.ContainerPort{
-			Name:          "http",
-			ContainerPort: int32(service.ServicePort),
-			Protocol:      apiv1.ProtocolTCP,
-		})
-	}
-	// Setup the Metrics Port
-	if service.MetricsPort != 0 {
-		deployment.Spec.Template.Spec.Containers[0].Ports = append(deployment.Spec.Template.Spec.Containers[0].Ports, apiv1.ContainerPort{
-			Name:          "metrics",
-			ContainerPort: int32(service.MetricsPort),
-			Protocol:      apiv1.ProtocolTCP,
-		})
 	}
 
 	// Setup the Probes
@@ -229,6 +219,27 @@ func (s *Scheduler) hydrateK8sDeployment(
 	}
 
 	return deployment
+}
+
+func getContainerPorts(service *eve.DeployService) []apiv1.ContainerPort {
+	var result []apiv1.ContainerPort
+	// Setup the Service Port
+	if service.ServicePort != 0 {
+		result = append(result, apiv1.ContainerPort{
+			Name:          "http",
+			ContainerPort: int32(service.ServicePort),
+			Protocol:      apiv1.ProtocolTCP,
+		})
+	}
+	// Setup the Metrics Port
+	if service.MetricsPort != 0 {
+		result = append(result, apiv1.ContainerPort{
+			Name:          "metrics",
+			ContainerPort: int32(service.MetricsPort),
+			Protocol:      apiv1.ProtocolTCP,
+		})
+	}
+	return result
 }
 
 func (s *Scheduler) watchPods(
@@ -325,7 +336,7 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 		return
 	}
 	if err := s.setupK8sAutoscaler(ctx, k8s, plan, service); err != nil {
-		failNLog(err, "an error occurred while setting up k8s pod autoscaler")
+		failNLog(err, "an error occurred while setting up k8s horizontal pod autoscaler")
 		return
 	}
 	service.Result = eve.DeployArtifactResultSuccess

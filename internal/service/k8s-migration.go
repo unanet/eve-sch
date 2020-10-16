@@ -158,11 +158,7 @@ func getK8sMigrationJob(
 							Image:           containerImage,
 						},
 					},
-					ImagePullSecrets: []apiv1.LocalObjectReference{
-						{
-							Name: "docker-cfg",
-						},
-					},
+					ImagePullSecrets: imagePullSecrets,
 				},
 			},
 		},

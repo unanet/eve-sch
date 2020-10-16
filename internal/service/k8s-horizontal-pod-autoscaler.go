@@ -2,21 +2,17 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
 	"github.com/pkg/errors"
-
 	"gitlab.unanet.io/devops/eve/pkg/eve"
+	"go.uber.org/zap"
 	autoscaling "k8s.io/api/autoscaling/v2beta2"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	apimachinerymetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-)
-
-// TODO: Should these be configurable in the DB???
-const (
-	minPodReplicas = 2
-	maxPodReplicas = 15
 )
 
 var (
@@ -26,21 +22,60 @@ var (
 	}
 )
 
-func hydrateK8sPodAutoScaling(serviceName, namespace string) *autoscaling.HorizontalPodAutoscaler {
+func parseUtilizationLimits(input []byte) (*eve.UtilizationLimits, error) {
+	if len(input) <= 5 {
+		return nil, nil
+	}
+	var utilLimits eve.UtilizationLimits
+	if err := json.Unmarshal(input, &utilLimits); err != nil {
+		return nil, err
+	}
+	return &utilLimits, nil
+}
+
+func parseReplicaLimits(input []byte) (*eve.ReplicaLimits, error) {
+	if len(input) <= 5 {
+		return nil, nil
+	}
+	var replicaLimits eve.ReplicaLimits
+	if err := json.Unmarshal(input, &replicaLimits); err != nil {
+		return nil, err
+	}
+	return &replicaLimits, nil
+}
+
+func hydrateK8sPodAutoScaling(service *eve.DeployService, plan *eve.NSDeploymentPlan) (*autoscaling.HorizontalPodAutoscaler, error) {
+
+	utilLimits, err := parseUtilizationLimits(service.UtilizationLimits)
+	if err != nil {
+		return nil, err
+	}
+	if utilLimits == nil {
+		return nil, nil
+	}
+
+	replicaLimits, err := parseReplicaLimits(service.ReplicaLimits)
+	if err != nil {
+		return nil, err
+	}
+	if replicaLimits == nil {
+		return nil, nil
+	}
+
 	return &autoscaling.HorizontalPodAutoscaler{
 		TypeMeta: hpaMetaData,
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      serviceName,
-			Namespace: namespace,
+			Name:      service.ServiceName,
+			Namespace: plan.Namespace.Name,
 		},
 		Spec: autoscaling.HorizontalPodAutoscalerSpec{
 			ScaleTargetRef: autoscaling.CrossVersionObjectReference{
 				Kind:       "Deployment",
-				Name:       serviceName,
+				Name:       service.ServiceName,
 				APIVersion: "apps/v1",
 			},
-			MinReplicas: int32Ptr(minPodReplicas),
-			MaxReplicas: maxPodReplicas,
+			MinReplicas: int32Ptr(replicaLimits.Min),
+			MaxReplicas: int32(replicaLimits.Max),
 			Metrics: []autoscaling.MetricSpec{
 				{
 					Type: autoscaling.ResourceMetricSourceType,
@@ -48,7 +83,7 @@ func hydrateK8sPodAutoScaling(serviceName, namespace string) *autoscaling.Horizo
 						Name: "cpu",
 						Target: autoscaling.MetricTarget{
 							Type:               autoscaling.UtilizationMetricType,
-							AverageUtilization: int32Ptr(75),
+							AverageUtilization: int32Ptr(utilLimits.CPU),
 						},
 					},
 				},
@@ -58,13 +93,13 @@ func hydrateK8sPodAutoScaling(serviceName, namespace string) *autoscaling.Horizo
 						Name: "memory",
 						Target: autoscaling.MetricTarget{
 							Type:               autoscaling.UtilizationMetricType,
-							AverageUtilization: int32Ptr(75),
+							AverageUtilization: int32Ptr(utilLimits.Memory),
 						},
 					},
 				},
 			},
 		},
-	}
+	}, nil
 }
 
 func (s *Scheduler) setupK8sAutoscaler(
@@ -76,13 +111,26 @@ func (s *Scheduler) setupK8sAutoscaler(
 	// We only setup AutoScaling when the Resource Requests were supplied
 	// the autoscaler uses the requested resources to determine when to scale
 	// so if they aren't being used, we won't setup the autoscaler
-	if len(service.ResourceRequests) == 0 {
+	// TODO: Fix this up with a helper/extension method
+	if len(service.ResourceRequests) <= 5 || len(service.ResourceLimits) <= 5 || len(service.UtilizationLimits) <= 5 {
+		s.Logger(ctx).Debug("not setting autoscaler",
+			zap.String("service", service.ServiceName),
+			zap.ByteString("resource_requests", service.ResourceRequests),
+			zap.ByteString("resource_limits", service.ResourceLimits),
+			zap.ByteString("utilization_limits", service.UtilizationLimits),
+		)
 		return nil
 	}
 
-	k8sAutoScaler := hydrateK8sPodAutoScaling(service.ServiceName, plan.Namespace.Name)
+	k8sAutoScaler, err := hydrateK8sPodAutoScaling(service, plan)
+	if err != nil {
+		return errors.Wrap(err, "an error occurred trying to hydrate the k8s autoscaler object")
+	}
+	if k8sAutoScaler == nil {
+		return fmt.Errorf("failed to hydrate k8s pod autoscaler")
+	}
 
-	_, err := k8s.AutoscalingV2beta2().HorizontalPodAutoscalers(plan.Namespace.Name).Get(ctx, service.ServiceName, apimachinerymetav1.GetOptions{
+	_, err = k8s.AutoscalingV2beta2().HorizontalPodAutoscalers(plan.Namespace.Name).Get(ctx, service.ServiceName, apimachinerymetav1.GetOptions{
 		TypeMeta: hpaMetaData,
 	})
 	if err != nil {
