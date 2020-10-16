@@ -417,6 +417,8 @@ gitlab.unanet.io/devops/eve v0.0.0-20201016020438-f57b4af0c5c5 h1:8a/ChB6OzQbTFz
 gitlab.unanet.io/devops/eve v0.0.0-20201016020438-f57b4af0c5c5/go.mod h1:cRIgd4tagIawmMqi+jxK3yVX+2fjrC/rlG2vs21KNVU=
 gitlab.unanet.io/devops/eve v0.0.0-20201016043207-a7025d19655d h1:gm9EOBiA4gJ9fvgwA9iTkYQXJ0Wh8ZDZitbmfnbsFYA=
 gitlab.unanet.io/devops/eve v0.0.0-20201016043207-a7025d19655d/go.mod h1:cRIgd4tagIawmMqi+jxK3yVX+2fjrC/rlG2vs21KNVU=
+gitlab.unanet.io/devops/eve v0.0.0-20201016045149-6d47c2121024 h1:zsW9T+enROCGpYb5jdYi6nwIA1q6l0TRZ4Gup0x7B3o=
+gitlab.unanet.io/devops/eve v0.0.0-20201016045149-6d47c2121024/go.mod h1:cRIgd4tagIawmMqi+jxK3yVX+2fjrC/rlG2vs21KNVU=
 go.mongodb.org/mongo-driver v1.1.0/go.mod h1:u7ryQJ+DOzQmeO7zB6MHyr8jkEQvC8vH7qLUO4lqsUM=
 go.opencensus.io v0.20.1/go.mod h1:6WKK9ahsWS3RSO+PY9ZHZUfv2irvY6gN279GOPZjmmk=
 go.opencensus.io v0.21.0/go.mod h1:mSImk1erAIZhrmZN+AvHh14ztQfjbGwt4TtuofqLduU=
