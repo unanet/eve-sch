@@ -282,30 +282,30 @@ func (s *Scheduler) watchPods(
 		}
 	}
 
-	if len(started) != instanceCount {
-		// make sure we don't get a false positive and actually check
-		pods, err := k8s.CoreV1().Pods(plan.Namespace.Name).List(ctx, metav1.ListOptions{
-			LabelSelector: labelSelector(service, timeNuance),
-		})
-		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("an error occurred while trying to deploy: %s, timed out waiting for app to start", service.ServiceName))
-		}
-
-		if len(pods.Items) != instanceCount {
-			return fmt.Errorf("an error occurred while trying to deploy: %s, pods != count", service.ServiceName)
-		}
-
-		var startedCount int
-		for _, x := range pods.Items {
-			if x.Status.ContainerStatuses[0].State.Running != nil {
-				startedCount += 1
-			}
-		}
-
-		if startedCount != instanceCount {
-			return fmt.Errorf("an error occurred while trying to deploy: %s, started != count", service.ServiceName)
-		}
-	}
+	//if len(started) != instanceCount {
+	//	// make sure we don't get a false positive and actually check
+	//	pods, err := k8s.CoreV1().Pods(plan.Namespace.Name).List(ctx, metav1.ListOptions{
+	//		LabelSelector: labelSelector(service, timeNuance),
+	//	})
+	//	if err != nil {
+	//		return errors.Wrap(err, fmt.Sprintf("an error occurred while trying to deploy: %s, timed out waiting for app to start", service.ServiceName))
+	//	}
+	//
+	//	if len(pods.Items) != instanceCount {
+	//		return fmt.Errorf("an error occurred while trying to deploy: %s, pods != count", service.ServiceName)
+	//	}
+	//
+	//	var startedCount int
+	//	for _, x := range pods.Items {
+	//		if x.Status.ContainerStatuses[0].State.Running != nil {
+	//			startedCount += 1
+	//		}
+	//	}
+	//
+	//	if startedCount != instanceCount {
+	//		return fmt.Errorf("an error occurred while trying to deploy: %s, started != count", service.ServiceName)
+	//	}
+	//}
 	return nil
 }
 
