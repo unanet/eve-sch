@@ -3,7 +3,8 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+
+	apiv1 "k8s.io/api/core/v1"
 
 	"github.com/pkg/errors"
 	"gitlab.unanet.io/devops/eve/pkg/eve"
@@ -15,6 +16,118 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+type replicas struct {
+	Min int `json:"min"`
+	Max int `json:"max"`
+}
+
+type utilization struct {
+	CPU    int `json:"cpu"`
+	Memory int `json:"memory"`
+}
+
+type AutoScaleSettings struct {
+	Enabled     bool        `json:"enabled"`
+	Utilization utilization `json:"utilization"`
+	Replicas    replicas    `json:"replicas"`
+}
+
+type PodResource struct {
+	Limit   apiv1.ResourceList `json:"limit"`
+	Request apiv1.ResourceList `json:"request"`
+}
+
+func (pr *PodResource) IsDefault() bool {
+	return pr.Limit.Cpu().IsZero() &&
+		pr.Limit.Memory().IsZero() &&
+		pr.Request.Memory().IsZero() &&
+		pr.Request.Cpu().IsZero()
+}
+
+func (as *AutoScaleSettings) IsDefault() bool {
+	return as.Enabled == false &&
+		as.Utilization.CPU == 0 &&
+		as.Utilization.Memory == 0 &&
+		as.Replicas.Min == 0 &&
+		as.Replicas.Max == 0
+}
+
+const (
+	minCPUMilli = 10          // (10m) 10 millicores
+	maxCPUMilli = 10000       // (10000m) 10000 millicores (10 CPU Cores)
+	minMemVal   = 1048576     // (1Mi) 1 Megabyte
+	maxMemVal   = 10485760000 // (10000Mi) 10,000 Megabyte (10 GB of RAM)
+	minMemUtil  = 1           // 1% Average Utilization
+	maxMemUtil  = 500         // 500% Average Utilization
+	minReplicas = 1           // 1 Pod Replica min // TODO: this might change when we can autoscale to zero?
+	maxReplicas = 1000        // 1000 Pod Replica Max
+)
+
+var (
+	invalidAutoScaler     = errors.New("invalid k8s autoscaler settings")
+	nilAutoScalerSettings = errors.New("autoscaler settings are nil (or less than 2 bytes)")
+)
+
+// Invalid checks is the supplied JSON config meets the min/max constraints
+func (as *AutoScaleSettings) Invalid() bool {
+	return as.Utilization.Memory < minMemUtil ||
+		as.Utilization.Memory > maxMemUtil ||
+		as.Replicas.Min < minReplicas ||
+		as.Replicas.Max > maxReplicas
+}
+
+// Invalid checks is the supplied JSON config meets the min/max constraints
+func (pr *PodResource) Invalid() bool {
+	return pr.Limit.Cpu().MilliValue() < minCPUMilli ||
+		pr.Limit.Cpu().MilliValue() > maxCPUMilli ||
+		pr.Limit.Memory().Value() < minMemVal ||
+		pr.Limit.Memory().Value() > maxMemVal ||
+		pr.Request.Cpu().MilliValue() < minCPUMilli ||
+		pr.Request.Cpu().MilliValue() > maxCPUMilli ||
+		pr.Limit.Memory().Value() < minMemVal ||
+		pr.Limit.Memory().Value() > maxMemVal
+}
+
+func (as *AutoScaleSettings) TargetRef(serviceName string) autoscaling.CrossVersionObjectReference {
+	return autoscaling.CrossVersionObjectReference{
+		Kind:       "Deployment",
+		Name:       serviceName,
+		APIVersion: "apps/v1",
+	}
+}
+
+func (as *AutoScaleSettings) UtilizationMetricSpecs() []autoscaling.MetricSpec {
+	var result []autoscaling.MetricSpec
+
+	if as.Utilization.Memory > 0 {
+		result = append(result, autoscaling.MetricSpec{
+			Type: autoscaling.ResourceMetricSourceType,
+			Resource: &autoscaling.ResourceMetricSource{
+				Name: "memory",
+				Target: autoscaling.MetricTarget{
+					Type:               autoscaling.UtilizationMetricType,
+					AverageUtilization: int32Ptr(as.Utilization.Memory),
+				},
+			},
+		})
+	}
+
+	if as.Utilization.CPU > 0 {
+		result = append(result, autoscaling.MetricSpec{
+			Type: autoscaling.ResourceMetricSourceType,
+			Resource: &autoscaling.ResourceMetricSource{
+				Name: "cpu",
+				Target: autoscaling.MetricTarget{
+					Type:               autoscaling.UtilizationMetricType,
+					AverageUtilization: int32Ptr(as.Utilization.CPU),
+				},
+			},
+		})
+	}
+
+	return result
+}
+
 var (
 	hpaMetaData = metav1.TypeMeta{
 		Kind:       "HorizontalPodAutoscaler",
@@ -22,27 +135,36 @@ var (
 	}
 )
 
-func (s *Scheduler) parseUtilizationLimits(ctx context.Context, input []byte) (*eve.UtilizationLimits, error) {
-	if len(input) <= 5 {
-		s.Logger(ctx).Debug("not setting utilization limit", zap.ByteString("utilization_limit", input))
+// { "enabled": true, "utilization": { "cpu": 80, "memory": 100 }, "replicas": { "min": 2, "max": 10 } }
+func (s *Scheduler) parseAutoScale(ctx context.Context, input []byte) (*AutoScaleSettings, error) {
+	if input == nil || len(input) <= 2 {
 		return nil, nil
 	}
-	var utilLimits eve.UtilizationLimits
-	if err := json.Unmarshal(input, &utilLimits); err != nil {
-		s.Logger(ctx).Warn("failed to unmarshal the utilization limit bytes", zap.ByteString("utilization_limit", input), zap.Error(err))
+	var autoscale AutoScaleSettings
+	if err := json.Unmarshal(input, &autoscale); err != nil {
+		s.Logger(ctx).Warn("failed to unmarshal the autoscale settings", zap.ByteString("autoscale", input), zap.Error(err))
 		return nil, err
 	}
-	return &utilLimits, nil
+	return &autoscale, nil
 }
 
 func (s *Scheduler) hydrateK8sPodAutoScaling(ctx context.Context, service *eve.DeployService, plan *eve.NSDeploymentPlan) (*autoscaling.HorizontalPodAutoscaler, error) {
-
-	utilLimits, err := s.parseUtilizationLimits(ctx, service.UtilizationLimits)
+	autoscale, err := s.parseAutoScale(ctx, service.Autoscaling)
 	if err != nil {
 		return nil, err
 	}
-	if utilLimits == nil {
-		s.Logger(ctx).Debug("nil utilization limit")
+
+	// Validate the incoming Autoscale settings
+	switch {
+	case autoscale == nil: // ``
+		return nil, nilAutoScalerSettings
+	case autoscale.IsDefault() == true: // `{}`
+		s.Logger(ctx).Debug("autoscale not set with default")
+		return nil, nil
+	case autoscale.Invalid(): // `{ "enabled": true, "limit": { "cpu": "10001m", "memory": "10001Mi" }}`
+		return nil, invalidAutoScaler
+	case autoscale.Enabled == false: // `{"enabled":false}
+		s.Logger(ctx).Debug("autoscale disabled")
 		return nil, nil
 	}
 
@@ -53,67 +175,22 @@ func (s *Scheduler) hydrateK8sPodAutoScaling(ctx context.Context, service *eve.D
 			Namespace: plan.Namespace.Name,
 		},
 		Spec: autoscaling.HorizontalPodAutoscalerSpec{
-			ScaleTargetRef: autoscaling.CrossVersionObjectReference{
-				Kind:       "Deployment",
-				Name:       service.ServiceName,
-				APIVersion: "apps/v1",
-			},
-			MinReplicas: int32Ptr(service.MinPod),
-			MaxReplicas: int32(service.MaxPod),
-			Metrics: []autoscaling.MetricSpec{
-				{
-					Type: autoscaling.ResourceMetricSourceType,
-					Resource: &autoscaling.ResourceMetricSource{
-						Name: "cpu",
-						Target: autoscaling.MetricTarget{
-							Type:               autoscaling.UtilizationMetricType,
-							AverageUtilization: int32Ptr(utilLimits.CPU),
-						},
-					},
-				},
-				{
-					Type: autoscaling.ResourceMetricSourceType,
-					Resource: &autoscaling.ResourceMetricSource{
-						Name: "memory",
-						Target: autoscaling.MetricTarget{
-							Type:               autoscaling.UtilizationMetricType,
-							AverageUtilization: int32Ptr(utilLimits.Memory),
-						},
-					},
-				},
-			},
+			ScaleTargetRef: autoscale.TargetRef(service.ServiceName),
+			MinReplicas:    int32Ptr(autoscale.Replicas.Min),
+			MaxReplicas:    int32(autoscale.Replicas.Max),
+			Metrics:        autoscale.UtilizationMetricSpecs(),
 		},
 	}, nil
 }
 
-func (s *Scheduler) setupK8sAutoscaler(
-	ctx context.Context,
-	k8s *kubernetes.Clientset,
-	plan *eve.NSDeploymentPlan,
-	service *eve.DeployService,
-) error {
-	// We only setup AutoScaling when the Resource Requests were supplied
-	// the autoscaler uses the requested resources to determine when to scale
-	// so if they aren't being used, we won't setup the autoscaler
-	// TODO: Fix this up with a helper/extension method
-	if len(service.ResourceRequests) <= 5 || len(service.ResourceLimits) <= 5 || len(service.UtilizationLimits) <= 5 {
-		s.Logger(ctx).Debug("not setting autoscaler",
-			zap.String("service", service.ServiceName),
-			zap.ByteString("resource_requests", service.ResourceRequests),
-			zap.ByteString("resource_limits", service.ResourceLimits),
-			zap.ByteString("utilization_limits", service.UtilizationLimits),
-		)
-		return nil
-	}
-
-	s.Logger(ctx).Debug("setup k8s autoscaler", zap.Any("service", service), zap.Any("plan", plan))
-
+func (s *Scheduler) setupK8sAutoscaler(ctx context.Context, k8s *kubernetes.Clientset, plan *eve.NSDeploymentPlan, service *eve.DeployService) error {
 	k8sAutoScaler, err := s.hydrateK8sPodAutoScaling(ctx, service, plan)
 	if err != nil {
 		return errors.Wrap(err, "an error occurred trying to hydrate the k8s autoscaler object")
 	}
 	if k8sAutoScaler == nil {
-		return fmt.Errorf("failed to hydrate k8s pod autoscaler")
+		s.Logger(ctx).Debug("not setting up the k8s autoscaler", zap.String("service", service.ServiceName))
+		return nil
 	}
 
 	_, err = k8s.AutoscalingV2beta2().HorizontalPodAutoscalers(plan.Namespace.Name).Get(ctx, service.ServiceName, apimachinerymetav1.GetOptions{

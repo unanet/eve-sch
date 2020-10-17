@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -30,9 +29,7 @@ var (
 		APIVersion: "apps/v1",
 	}
 
-	k8sDockerSecret = apiv1.LocalObjectReference{
-		Name: "docker-cfg",
-	}
+	k8sDockerSecret = apiv1.LocalObjectReference{Name: "docker-cfg"}
 
 	imagePullSecrets = []apiv1.LocalObjectReference{k8sDockerSecret}
 )
@@ -70,6 +67,32 @@ func deployAnnotations(port int) map[string]string {
 	}
 }
 
+// { "limit": { "cpu": "1000m", "memory": "3000Mi" }, "request": { "cpu": "250m", "memory": "2000Mi" } }
+func (s *Scheduler) parsePodResource(ctx context.Context, input []byte) (*PodResource, error) {
+	if input == nil || len(input) <= 2 {
+		s.Logger(ctx).Warn("invalid pod resource input", zap.ByteString("pod_resource", input))
+		return nil, nil
+	}
+	var podResource PodResource
+	if err := json.Unmarshal(input, &podResource); err != nil {
+		s.Logger(ctx).Warn("failed to unmarshal the autoscale settings", zap.ByteString("pod_resource", input), zap.Error(err))
+		return nil, err
+	}
+
+	if podResource.IsDefault() {
+		s.Logger(ctx).Debug("default {} pod resource values", zap.ByteString("pod_resource", input))
+		return nil, nil
+	}
+
+	if podResource.Invalid() {
+		err := fmt.Errorf("the pod_resource values exceed the limits")
+		s.Logger(ctx).Error("invalid pod resource values", zap.ByteString("pod_resource", input), zap.Error(err))
+		return nil, err
+	}
+
+	return &podResource, nil
+}
+
 func (s *Scheduler) ParseResourceRequirements(ctx context.Context, input []byte) (apiv1.ResourceList, error) {
 	if len(input) <= 5 {
 		return nil, nil
@@ -98,20 +121,18 @@ func (s *Scheduler) ParseProbe(ctx context.Context, input []byte) (*apiv1.Probe,
 	return &probe, nil
 }
 
-func (s *Scheduler) setupK8sDeployment(
-	ctx context.Context,
-	k8s *kubernetes.Clientset,
-	plan *eve.NSDeploymentPlan,
-	service *eve.DeployService,
-	timeNuance string,
-) error {
-	newDeployment := s.hydrateK8sDeployment(ctx, plan, service, timeNuance)
-	_, err := k8s.AppsV1().Deployments(plan.Namespace.Name).Get(ctx, service.ServiceName, metav1.GetOptions{})
+func (s *Scheduler) setupK8sDeployment(ctx context.Context, k8s *kubernetes.Clientset, plan *eve.NSDeploymentPlan, service *eve.DeployService, timeNuance string) error {
+
+	newDeployment, err := s.hydrateK8sDeployment(ctx, plan, service, timeNuance)
+	if err != nil {
+		return errors.Wrap(err, "failed to hydrate the k8s deployment object")
+	}
+
+	_, err = k8s.AppsV1().Deployments(plan.Namespace.Name).Get(ctx, service.ServiceName, metav1.GetOptions{})
 	if err != nil {
 		if k8sErrors.IsNotFound(err) {
 			// This app hasn't been deployed yet so we need to deploy it
-			_, err = k8s.AppsV1().Deployments(plan.Namespace.Name).Create(ctx, newDeployment, metav1.CreateOptions{})
-			if err != nil {
+			if _, err := k8s.AppsV1().Deployments(plan.Namespace.Name).Create(ctx, newDeployment, metav1.CreateOptions{}); err != nil {
 				return errors.Wrap(err, "an error occurred trying to create the deployment")
 			}
 			return nil
@@ -120,13 +141,9 @@ func (s *Scheduler) setupK8sDeployment(
 		return errors.Wrap(err, "an error occurred trying to check for the deployment")
 	}
 	// we were able to retrieve the app which mean we need to run update instead of create
-	_, err = k8s.AppsV1().Deployments(plan.Namespace.Name).Update(ctx, newDeployment, metav1.UpdateOptions{
-		TypeMeta: deploymentMetaData,
-	})
-	if err != nil {
+	if _, err = k8s.AppsV1().Deployments(plan.Namespace.Name).Update(ctx, newDeployment, metav1.UpdateOptions{TypeMeta: deploymentMetaData}); err != nil {
 		return errors.Wrap(err, "an error occurred trying to update the deployment")
 	}
-
 	return nil
 }
 
@@ -142,12 +159,7 @@ func matchLabels(service *eve.DeployService, timeNuance string) map[string]strin
 	}
 }
 
-func (s *Scheduler) hydrateK8sDeployment(
-	ctx context.Context,
-	plan *eve.NSDeploymentPlan,
-	service *eve.DeployService,
-	nuance string,
-) *appsv1.Deployment {
+func (s *Scheduler) hydrateK8sDeployment(ctx context.Context, plan *eve.NSDeploymentPlan, service *eve.DeployService, nuance string) (*appsv1.Deployment, error) {
 
 	deployment := &appsv1.Deployment{
 		TypeMeta: deploymentMetaData,
@@ -191,29 +203,36 @@ func (s *Scheduler) hydrateK8sDeployment(
 	}
 
 	// Setup the Probes
-	if probe, err := s.ParseProbe(ctx, service.ReadinessProbe); err == nil && probe != nil {
-		deployment.Spec.Template.Spec.Containers[0].ReadinessProbe = probe
+	readinessProbe, err := s.ParseProbe(ctx, service.ReadinessProbe)
+	if err != nil {
+		return nil, err
 	}
-	if probe, err := s.ParseProbe(ctx, service.LivelinessProbe); err == nil && probe != nil {
-		deployment.Spec.Template.Spec.Containers[0].LivenessProbe = probe
-	}
-
-	// Setup the Resource Constraints
-	var resourceRequirements apiv1.ResourceRequirements
-
-	if resourceReqs, err := s.ParseResourceRequirements(ctx, service.ResourceRequests); err == nil && resourceReqs != nil {
-		resourceRequirements.Requests = resourceReqs
+	if readinessProbe != nil {
+		deployment.Spec.Template.Spec.Containers[0].ReadinessProbe = readinessProbe
 	}
 
-	if resourceLimits, err := s.ParseResourceRequirements(ctx, service.ResourceLimits); err == nil && resourceLimits != nil {
-		resourceRequirements.Limits = resourceLimits
+	livelinessProbe, err := s.ParseProbe(ctx, service.LivelinessProbe)
+	if err != nil {
+		return nil, err
+	}
+	if livelinessProbe != nil {
+		deployment.Spec.Template.Spec.Containers[0].LivenessProbe = livelinessProbe
 	}
 
-	if resourceRequirements.Requests != nil || resourceRequirements.Limits != nil {
-		deployment.Spec.Template.Spec.Containers[0].Resources = resourceRequirements
+	// Setup the pod resource constraints
+	podResource, err := s.parsePodResource(ctx, service.PodResource)
+	if err != nil {
+		return nil, err
 	}
 
-	return deployment
+	if podResource != nil {
+		deployment.Spec.Template.Spec.Containers[0].Resources = apiv1.ResourceRequirements{
+			Requests: podResource.Request,
+			Limits:   podResource.Limit,
+		}
+	}
+
+	return deployment, nil
 }
 
 func getContainerPorts(service *eve.DeployService) []apiv1.ContainerPort {
@@ -256,11 +275,6 @@ func (s *Scheduler) watchPods(
 	}
 	started := make(map[string]bool)
 
-	var instanceCount = service.Count
-	if strings.HasPrefix(service.ServiceName, "eve-sch") {
-		instanceCount = 1
-	}
-
 	for event := range watch.ResultChan() {
 		p, ok := event.Object.(*apiv1.Pod)
 		if !ok {
@@ -277,35 +291,10 @@ func (s *Scheduler) watchPods(
 			started[p.Name] = true
 		}
 
-		if len(started) == instanceCount {
+		if len(started) >= 1 {
 			watch.Stop()
 		}
 	}
-
-	//if len(started) != instanceCount {
-	//	// make sure we don't get a false positive and actually check
-	//	pods, err := k8s.CoreV1().Pods(plan.Namespace.Name).List(ctx, metav1.ListOptions{
-	//		LabelSelector: labelSelector(service, timeNuance),
-	//	})
-	//	if err != nil {
-	//		return errors.Wrap(err, fmt.Sprintf("an error occurred while trying to deploy: %s, timed out waiting for app to start", service.ServiceName))
-	//	}
-	//
-	//	if len(pods.Items) != instanceCount {
-	//		return fmt.Errorf("an error occurred while trying to deploy: %s, pods != count", service.ServiceName)
-	//	}
-	//
-	//	var startedCount int
-	//	for _, x := range pods.Items {
-	//		if x.Status.ContainerStatuses[0].State.Running != nil {
-	//			startedCount += 1
-	//		}
-	//	}
-	//
-	//	if startedCount != instanceCount {
-	//		return fmt.Errorf("an error occurred while trying to deploy: %s, started != count", service.ServiceName)
-	//	}
-	//}
 	return nil
 }
 
@@ -318,18 +307,22 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 	}
 
 	timeNuance := strconv.Itoa(int(time.Now().Unix()))
+	// k8s Service is Required
 	if err := s.setupK8sService(ctx, k8s, plan, service); err != nil {
 		failNLog(err, "an error occurred setting up the k8s service")
 		return
 	}
+	// k8s Deployment is Required
 	if err := s.setupK8sDeployment(ctx, k8s, plan, service, timeNuance); err != nil {
 		failNLog(err, "an error occurred setting up the k8s deployment")
 		return
 	}
+	// We wait/watch for 1 successful pod to come up
 	if err := s.watchPods(ctx, k8s, plan, service, timeNuance); err != nil {
 		failNLog(err, "an error occurred while watching k8s pods")
 		return
 	}
+	// k8s autoscaler is optional
 	if err := s.setupK8sAutoscaler(ctx, k8s, plan, service); err != nil {
 		failNLog(err, "an error occurred while setting up k8s horizontal pod autoscaler")
 		return
