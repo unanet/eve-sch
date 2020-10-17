@@ -148,64 +148,74 @@ func (s *Scheduler) parseAutoScale(ctx context.Context, input []byte) (*AutoScal
 	return &autoscale, nil
 }
 
-func (s *Scheduler) hydrateK8sPodAutoScaling(ctx context.Context, service *eve.DeployService, plan *eve.NSDeploymentPlan) (*autoscaling.HorizontalPodAutoscaler, error) {
+func (s *Scheduler) setupK8sAutoscaler(ctx context.Context, k8s *kubernetes.Clientset, plan *eve.NSDeploymentPlan, service *eve.DeployService) error {
+	var removeAutoScaler bool
 	autoscale, err := s.parseAutoScale(ctx, service.Autoscaling)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Validate the incoming Autoscale settings
 	switch {
 	case autoscale == nil: // ``
-		return nil, nilAutoScalerSettings
+		s.Logger(ctx).Debug("autoscale config is nil")
+		removeAutoScaler = true
 	case autoscale.IsDefault() == true: // `{}`
 		s.Logger(ctx).Debug("autoscale not set with default")
-		return nil, nil
+		removeAutoScaler = true
 	case autoscale.Invalid(): // `{ "enabled": true, "limit": { "cpu": "10001m", "memory": "10001Mi" }}`
-		return nil, invalidAutoScaler
+		return invalidAutoScaler
 	case autoscale.Enabled == false: // `{"enabled":false}
-		s.Logger(ctx).Debug("autoscale disabled")
-		return nil, nil
+		s.Logger(ctx).Debug("autoscale disabled deleting existing autoscaler if exist")
+		removeAutoScaler = true
 	}
 
-	return &autoscaling.HorizontalPodAutoscaler{
-		TypeMeta: hpaMetaData,
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      service.ServiceName,
-			Namespace: plan.Namespace.Name,
-		},
-		Spec: autoscaling.HorizontalPodAutoscalerSpec{
-			ScaleTargetRef: autoscale.TargetRef(service.ServiceName),
-			MinReplicas:    int32Ptr(autoscale.Replicas.Min),
-			MaxReplicas:    int32(autoscale.Replicas.Max),
-			Metrics:        autoscale.UtilizationMetricSpecs(),
-		},
-	}, nil
-}
+	var k8sAutoScaler *autoscaling.HorizontalPodAutoscaler
 
-func (s *Scheduler) setupK8sAutoscaler(ctx context.Context, k8s *kubernetes.Clientset, plan *eve.NSDeploymentPlan, service *eve.DeployService) error {
-	k8sAutoScaler, err := s.hydrateK8sPodAutoScaling(ctx, service, plan)
-	if err != nil {
-		return errors.Wrap(err, "an error occurred trying to hydrate the k8s autoscaler object")
-	}
-	if k8sAutoScaler == nil {
-		s.Logger(ctx).Debug("not setting up the k8s autoscaler", zap.String("service", service.ServiceName))
-		return nil
+	// We can remove and existing autoscaler by setting enabled: false
+	// or by leaving default json {}
+	// OR my completely removing the autoscaling value field in the DB
+	// The "normal/standard" way of doing this should just be `{"enabled": false}`
+	if removeAutoScaler == false {
+		k8sAutoScaler = &autoscaling.HorizontalPodAutoscaler{
+			TypeMeta:   hpaMetaData,
+			ObjectMeta: metav1.ObjectMeta{Name: service.ServiceName, Namespace: plan.Namespace.Name},
+			Spec: autoscaling.HorizontalPodAutoscalerSpec{
+				ScaleTargetRef: autoscale.TargetRef(service.ServiceName),
+				MinReplicas:    int32Ptr(autoscale.Replicas.Min),
+				MaxReplicas:    int32(autoscale.Replicas.Max),
+				Metrics:        autoscale.UtilizationMetricSpecs(),
+			},
+		}
 	}
 
-	_, err = k8s.AutoscalingV2beta2().HorizontalPodAutoscalers(plan.Namespace.Name).Get(ctx, service.ServiceName, apimachinerymetav1.GetOptions{
-		TypeMeta: hpaMetaData,
-	})
+	_, err = k8s.AutoscalingV2beta2().HorizontalPodAutoscalers(plan.Namespace.Name).Get(ctx, service.ServiceName, apimachinerymetav1.GetOptions{TypeMeta: hpaMetaData})
 	if err != nil {
 		if k8sErrors.IsNotFound(err) {
-			if _, err := k8s.AutoscalingV2beta2().HorizontalPodAutoscalers(plan.Namespace.Name).Create(ctx, k8sAutoScaler, apimachinerymetav1.CreateOptions{}); err != nil {
-				// an error occurred trying to see if the app is already deployed
-				return errors.Wrap(err, "an error occurred trying to create the autoscaler")
+			if removeAutoScaler == false {
+				if _, err := k8s.AutoscalingV2beta2().HorizontalPodAutoscalers(plan.Namespace.Name).Create(ctx, k8sAutoScaler, apimachinerymetav1.CreateOptions{}); err != nil {
+					// an error occurred trying to see if the app is already deployed
+					return errors.Wrap(err, "an error occurred trying to create the autoscaler")
+				}
+			} else {
+				// nothing to remove (the autoscaler does not exist yet so we can't remove it)
+				return nil
 			}
 		} else {
 			// an error occurred trying to see if the app is already deployed
 			return errors.Wrap(err, "an error occurred trying to get the autoscaler")
 		}
+	}
+
+	if removeAutoScaler {
+		if err = k8s.AutoscalingV2beta2().HorizontalPodAutoscalers(plan.Namespace.Name).Delete(ctx, service.ServiceName, apimachinerymetav1.DeleteOptions{
+			TypeMeta: hpaMetaData,
+		}); err != nil {
+			// an error occurred trying to delete the existing autoscaler
+			return errors.Wrap(err, "an error occurred trying to delete the existing autoscaler")
+		}
+		// Deletion successful lets bail out
+		return nil
 	}
 
 	if _, err = k8s.AutoscalingV2beta2().HorizontalPodAutoscalers(plan.Namespace.Name).Update(ctx, k8sAutoScaler, apimachinerymetav1.UpdateOptions{
@@ -214,5 +224,6 @@ func (s *Scheduler) setupK8sAutoscaler(ctx context.Context, k8s *kubernetes.Clie
 		// an error occurred trying to see if the app is already deployed
 		return errors.Wrap(err, "an error occurred trying to update the autoscaler")
 	}
+	// Update successful lets return to caller
 	return nil
 }
