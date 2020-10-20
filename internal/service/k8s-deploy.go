@@ -8,8 +8,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-
-	"gitlab.unanet.io/devops/eve-sch/internal/config"
 	"gitlab.unanet.io/devops/eve/pkg/eve"
 	"go.uber.org/zap"
 	appsv1 "k8s.io/api/apps/v1"
@@ -17,6 +15,8 @@ import (
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+
+	"gitlab.unanet.io/devops/eve-sch/internal/config"
 )
 
 const (
@@ -283,9 +283,11 @@ func (s *Scheduler) watchPods(
 		for _, x := range p.Status.ContainerStatuses {
 			if x.LastTerminationState.Terminated != nil {
 				failNLog(nil, "pod failed to start and returned a non zero exit code: %d", x.LastTerminationState.Terminated.ExitCode)
-				continue
+				watch.Stop()
+				return nil
 			}
-			if !*x.Started {
+
+			if !x.Ready {
 				continue
 			}
 			started[p.Name] = true
