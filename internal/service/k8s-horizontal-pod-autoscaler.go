@@ -134,19 +134,6 @@ var (
 	}
 )
 
-//if input == nil || len(input) < 2 {
-//s.Logger(ctx).Warn("invalid pod resource input", zap.ByteString("pod_resource", input))
-//return nil, nil
-//}
-//if len(input) == 2 {
-//if string(input[0]) == "{" && string(input[1]) == "}" {
-//s.Logger(ctx).Debug("{} pod resource default", zap.ByteString("pod_resource", input))
-//} else {
-//s.Logger(ctx).Error("invalid pod resource input", zap.ByteString("pod_resource", input))
-//}
-//return nil, nil
-//}
-
 // { "enabled": true, "utilization": { "cpu": 80, "memory": 100 }, "replicas": { "min": 2, "max": 10 } }
 func (s *Scheduler) parseAutoScale(ctx context.Context, input []byte) (*AutoScaleSettings, error) {
 	if input == nil || len(input) < 2 {
