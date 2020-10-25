@@ -64,8 +64,7 @@ const (
 )
 
 var (
-	invalidAutoScaler     = errors.New("invalid k8s autoscaler settings")
-	nilAutoScalerSettings = errors.New("autoscaler settings are nil (or less than 2 bytes)")
+	invalidAutoScaler = errors.New("invalid k8s autoscaler settings")
 )
 
 // Invalid checks is the supplied JSON config meets the min/max constraints
@@ -135,14 +134,36 @@ var (
 	}
 )
 
+//if input == nil || len(input) < 2 {
+//s.Logger(ctx).Warn("invalid pod resource input", zap.ByteString("pod_resource", input))
+//return nil, nil
+//}
+//if len(input) == 2 {
+//if string(input[0]) == "{" && string(input[1]) == "}" {
+//s.Logger(ctx).Debug("{} pod resource default", zap.ByteString("pod_resource", input))
+//} else {
+//s.Logger(ctx).Error("invalid pod resource input", zap.ByteString("pod_resource", input))
+//}
+//return nil, nil
+//}
+
 // { "enabled": true, "utilization": { "cpu": 80, "memory": 100 }, "replicas": { "min": 2, "max": 10 } }
 func (s *Scheduler) parseAutoScale(ctx context.Context, input []byte) (*AutoScaleSettings, error) {
-	if input == nil || len(input) <= 2 {
+	if input == nil || len(input) < 2 {
+		s.Logger(ctx).Warn("invalid pod autoscale input", zap.ByteString("pod_autoscale", input))
+		return nil, nil
+	}
+	if len(input) == 2 {
+		if string(input[0]) == "{" && string(input[1]) == "}" {
+			s.Logger(ctx).Debug("{} pod autoscale default", zap.ByteString("pod_autoscale", input))
+		} else {
+			s.Logger(ctx).Error("invalid pod autoscale input", zap.ByteString("pod_autoscale", input))
+		}
 		return nil, nil
 	}
 	var autoscale AutoScaleSettings
 	if err := json.Unmarshal(input, &autoscale); err != nil {
-		s.Logger(ctx).Warn("failed to unmarshal the autoscale settings", zap.ByteString("autoscale", input), zap.Error(err))
+		s.Logger(ctx).Error("failed to unmarshal the autoscale settings", zap.ByteString("autoscale", input), zap.Error(err))
 		return nil, err
 	}
 	return &autoscale, nil
@@ -172,9 +193,9 @@ func (s *Scheduler) setupK8sAutoscaler(ctx context.Context, k8s *kubernetes.Clie
 
 	var k8sAutoScaler *autoscaling.HorizontalPodAutoscaler
 
-	// We can remove and existing autoscaler by setting enabled: false
+	// We can remove an existing autoscaler by setting enabled: false
 	// or by leaving default json {}
-	// OR my completely removing the autoscaling value field in the DB
+	// OR by completely removing the autoscaling value field in the DB
 	// The "normal/standard" way of doing this should just be `{"enabled": false}`
 	if removeAutoScaler == false {
 		k8sAutoScaler = &autoscaling.HorizontalPodAutoscaler{
