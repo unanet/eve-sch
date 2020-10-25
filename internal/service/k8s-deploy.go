@@ -69,8 +69,16 @@ func deployAnnotations(port int) map[string]string {
 
 // { "limit": { "cpu": "1000m", "memory": "3000Mi" }, "request": { "cpu": "250m", "memory": "2000Mi" } }
 func (s *Scheduler) parsePodResource(ctx context.Context, input []byte) (*PodResource, error) {
-	if input == nil || len(input) <= 2 {
+	if input == nil || len(input) < 2 {
 		s.Logger(ctx).Warn("invalid pod resource input", zap.ByteString("pod_resource", input))
+		return nil, nil
+	}
+	if len(input) == 2 {
+		if string(input[0]) == "{" && string(input[1]) == "}" {
+			s.Logger(ctx).Debug("{} pod resource default", zap.ByteString("pod_resource", input))
+		} else {
+			s.Logger(ctx).Error("invalid pod resource input", zap.ByteString("pod_resource", input))
+		}
 		return nil, nil
 	}
 	var podResource PodResource
