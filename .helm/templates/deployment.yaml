@@ -46,7 +46,9 @@ spec:
             - name: VAULT_K8S_MOUNT
               value: {{ .Values.vaultK8sMount }}
             - name: VAULT_K8S_CLUSTER_NAME
-              value: {{ .Values.vaultK8sClusterName}}
+              value: {{ .Values.vaultK8sClusterName }}
+            - name: INIT_LOG_LEVEL
+              value: {{ .Values.initLogLevel }}
           ports:
             - containerPort: 3001
               name: metrics
