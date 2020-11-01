@@ -83,7 +83,7 @@ func (s *Scheduler) parsePodResource(ctx context.Context, input []byte) (*PodRes
 	}
 	var podResource PodResource
 	if err := json.Unmarshal(input, &podResource); err != nil {
-		s.Logger(ctx).Warn("failed to unmarshal the autoscale settings", zap.ByteString("pod_resource", input), zap.Error(err))
+		s.Logger(ctx).Error("failed to unmarshal the autoscale settings", zap.ByteString("pod_resource", input), zap.Error(err))
 		return nil, err
 	}
 
@@ -92,10 +92,12 @@ func (s *Scheduler) parsePodResource(ctx context.Context, input []byte) (*PodRes
 		return nil, nil
 	}
 
+	// We have this here as a safety guard
+	// it protects us from setting values too high or too low
+	// when this occurs, we will log an error and return nil, so that the pod resources don't get set
 	if podResource.Invalid() {
-		err := fmt.Errorf("the pod_resource values exceed the limits")
-		s.Logger(ctx).Error("invalid pod resource values", zap.ByteString("pod_resource", input), zap.Error(err))
-		return nil, err
+		s.Logger(ctx).Error("invalid pod resource values", zap.ByteString("pod_resource", input))
+		return nil, nil
 	}
 
 	return &podResource, nil
