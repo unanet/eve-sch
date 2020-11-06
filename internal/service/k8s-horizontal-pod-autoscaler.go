@@ -53,14 +53,14 @@ func (as *AutoScaleSettings) IsDefault() bool {
 }
 
 const (
-	minCPUMilli = 10          // (10m) 10 millicores
-	maxCPUMilli = 10000       // (10000m) 10000 millicores (10 CPU Cores)
-	minMemVal   = 1048576     // (1Mi) 1 Megabyte
-	maxMemVal   = 10485760000 // (10000Mi) 10,000 Megabyte (10 GB of RAM)
-	minMemUtil  = 1           // 1% Average Utilization
-	maxMemUtil  = 500         // 500% Average Utilization
-	minReplicas = 1           // 1 Pod Replica min // TODO: this might change when we can autoscale to zero?
-	maxReplicas = 1000        // 1000 Pod Replica Max
+	minCPUMilli = 10           // (10m) 10 millicores
+	maxCPUMilli = 10000        // (10000m) 10000 millicores (10 CPU Cores)
+	minMemVal   = 1048576      // (1Mi) 1 Megabyte
+	maxMemVal   = 104857600000 // (104857M) 104,006 Megabyte (104.6 GB of RAM)
+	minMemUtil  = 1            // 1% Average Utilization
+	maxMemUtil  = 500          // 500% Average Utilization
+	minReplicas = 1            // 1 Pod Replica min // TODO: this might change when we can autoscale to zero?
+	maxReplicas = 1000         // 1000 Pod Replica Max
 )
 
 var (
