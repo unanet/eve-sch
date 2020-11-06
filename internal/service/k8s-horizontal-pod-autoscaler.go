@@ -56,7 +56,7 @@ const (
 	minCPUMilli = 10           // (10m) 10 millicores
 	maxCPUMilli = 10000        // (10000m) 10000 millicores (10 CPU Cores)
 	minMemVal   = 1048576      // (1Mi) 1 Megabyte
-	maxMemVal   = 104857600000 // (104857M) 104,006 Megabyte (104.6 GB of RAM)
+	maxMemVal   = 104857600000 // (104857M) 104,857.6 Megabyte (104.8576 GB of RAM)
 	minMemUtil  = 1            // 1% Average Utilization
 	maxMemUtil  = 500          // 500% Average Utilization
 	minReplicas = 1            // 1 Pod Replica min // TODO: this might change when we can autoscale to zero?
