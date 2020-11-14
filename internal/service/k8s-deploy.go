@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"gitlab.unanet.io/devops/eve-sch/internal/config"
 	"gitlab.unanet.io/devops/eve/pkg/eve"
 	"go.uber.org/zap"
 	appsv1 "k8s.io/api/apps/v1"
@@ -15,12 +16,16 @@ import (
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-
-	"gitlab.unanet.io/devops/eve-sch/internal/config"
 )
 
+// Public CONST
 const (
 	DockerRepoFormat = "unanet-%s.jfrog.io"
+)
+
+// Private CONST
+const (
+	defaultNodeGroupLabel = "shared"
 )
 
 var (
@@ -29,9 +34,7 @@ var (
 		APIVersion: "apps/v1",
 	}
 
-	k8sDockerSecret = apiv1.LocalObjectReference{Name: "docker-cfg"}
-
-	imagePullSecrets = []apiv1.LocalObjectReference{k8sDockerSecret}
+	imagePullSecrets = []apiv1.LocalObjectReference{{Name: "docker-cfg"}}
 )
 
 func int32Ptr(i int) *int32 {
@@ -240,6 +243,21 @@ func (s *Scheduler) hydrateK8sDeployment(ctx context.Context, plan *eve.NSDeploy
 			Requests: podResource.Request,
 			Limits:   podResource.Limit,
 		}
+	}
+
+	// Hiding this behind a feature flag for now
+	// until all node group labels are added to all machines in all clusters
+	if config.GetConfig().EnableNodeGroup {
+		if len(service.NodeGroup) <= 0 {
+			s.Logger(ctx).Warn("node group empty using default 'shared' value")
+			service.NodeGroup = defaultNodeGroupLabel
+		}
+
+		deployment.Spec.Template.Spec.NodeSelector = map[string]string{
+			"node-group": service.NodeGroup,
+		}
+	} else {
+		s.Logger(ctx).Info("skipping node group selector: EVE_ENABLE_NODE_GROUP false", zap.Any("deployment_name", deployment.ObjectMeta.Name))
 	}
 
 	return deployment, nil

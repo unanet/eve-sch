@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/dghubble/sling"
-
 	"gitlab.unanet.io/devops/eve/pkg/errors"
 	ehttp "gitlab.unanet.io/devops/eve/pkg/http"
 	"gitlab.unanet.io/devops/eve/pkg/json"
@@ -33,10 +32,10 @@ func NewTrigger(timeout time.Duration) *Trigger {
 		Transport: ehttp.LoggingTransport,
 	}
 
-	sling := sling.New().Client(httpClient).
+	slingClient := sling.New().Client(httpClient).
 		Add("User-Agent", userAgent).
 		ResponseDecoder(json.NewJsonDecoder())
-	return &Trigger{sling: sling}
+	return &Trigger{sling: slingClient}
 }
 
 func (c *Trigger) Post(ctx context.Context, url string, code string, body interface{}) (*Response, error) {

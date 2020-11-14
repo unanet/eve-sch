@@ -7,13 +7,15 @@ go 1.14
 require (
 	github.com/aws/aws-sdk-go v1.25.41
 	github.com/dghubble/sling v1.3.0
-	github.com/docker/docker v1.13.1
+	github.com/docker/docker v1.13.2-0.20170601211448-f5ec1e2936dc
+	github.com/go-playground/universal-translator v0.17.0 // indirect
 	github.com/golang/protobuf v1.4.1 // indirect
 	github.com/kelseyhightower/envconfig v1.4.0
+	github.com/leodido/go-urn v1.2.0 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/satori/go.uuid v1.2.0
 	github.com/stretchr/testify v1.4.0
-	gitlab.unanet.io/devops/eve v0.0.0-20201018041942-029e9cc5b486
+	gitlab.unanet.io/devops/eve v0.0.0-20201113235954-9727794ecdcb
 	go.uber.org/zap v1.15.0
 	golang.org/x/crypto v0.0.0-20200429183012-4b2356b1ed79 // indirect
 	golang.org/x/net v0.0.0-20200506145744-7e3656a0809f // indirect

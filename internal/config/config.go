@@ -5,11 +5,9 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
-	"go.uber.org/zap"
-
-	"gitlab.unanet.io/devops/eve/pkg/log"
-
 	"gitlab.unanet.io/devops/eve-sch/internal/vault"
+	"gitlab.unanet.io/devops/eve/pkg/log"
+	"go.uber.org/zap"
 )
 
 var (
@@ -32,6 +30,7 @@ type Config struct {
 	S3Bucket               string        `split_words:"true" required:"true"`
 	AWSRegion              string        `split_words:"true" required:"true"`
 	MetricsPort            int           `split_words:"true" default:"3001"`
+	EnableNodeGroup        bool          `split_words:"true" default:"false"`
 }
 
 func GetConfig() Config {
