@@ -56,7 +56,6 @@ func TokenParserForExistingToken(_ *Client) TokenParser {
 
 func TokenParserK8s(c *Client) TokenParser {
 	return func(ctx context.Context) (string, error) {
-		log.Logger.Debug("vault kubernetes login token parser", zap.String("vault_role", c.vaultRole))
 		data, err := ioutil.ReadFile(k8sTokenPath)
 		if err != nil {
 			return "", errors.Wrap(err)
@@ -112,7 +111,6 @@ func TokenParserK8s(c *Client) TokenParser {
 			return "", errors.Wrapf("/auth/client_token property not a string")
 		}
 
-		log.Logger.Debug("vault kubernetes login sucess")
 		return token, nil
 	}
 }
@@ -179,7 +177,6 @@ func getMap(data map[string]interface{}) map[string]string {
 }
 
 func (c *Client) getKvSecret(ctx context.Context, path string) (map[string]interface{}, error) {
-	log.Logger.Debug("vault get KvSecret", zap.String("path", path), zap.String("cluster_name", c.clusterName))
 	token, err := c.tokenParser(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err)

@@ -64,7 +64,7 @@ const (
 )
 
 var (
-	invalidAutoScaler = errors.New("invalid k8s autoscaler settings")
+	invalidAutoScalerErr = errors.New("invalid k8s autoscaler settings")
 )
 
 // Invalid checks is the supplied JSON config meets the min/max constraints
@@ -141,10 +141,8 @@ func (s *Scheduler) parseAutoScale(ctx context.Context, input []byte) (*AutoScal
 		return nil, nil
 	}
 	if len(input) == 2 {
-		if string(input[0]) == "{" && string(input[1]) == "}" {
-			s.Logger(ctx).Debug("{} pod autoscale default", zap.ByteString("pod_autoscale", input))
-		} else {
-			s.Logger(ctx).Error("invalid pod autoscale input", zap.ByteString("pod_autoscale", input))
+		if string(input[0]) != "{" || string(input[1]) != "}" {
+			s.Logger(ctx).Warn("invalid pod autoscale input", zap.ByteString("pod_autoscale", input))
 		}
 		return nil, nil
 	}
@@ -165,17 +163,10 @@ func (s *Scheduler) setupK8sAutoscaler(ctx context.Context, k8s *kubernetes.Clie
 
 	// Validate the incoming Autoscale settings
 	switch {
-	case autoscale == nil: // ``
-		s.Logger(ctx).Debug("autoscale config is nil")
-		removeAutoScaler = true
-	case autoscale.IsDefault() == true: // `{}`
-		s.Logger(ctx).Debug("autoscale not set with default")
+	case autoscale == nil, autoscale.IsDefault() == true, autoscale.Enabled == false: // `` or `{}` or `{"enabled":false}`
 		removeAutoScaler = true
 	case autoscale.Invalid(): // `{ "enabled": true, "limit": { "cpu": "10001m", "memory": "10001Mi" }}`
-		return invalidAutoScaler
-	case autoscale.Enabled == false: // `{"enabled":false}
-		s.Logger(ctx).Debug("autoscale disabled deleting existing autoscaler if exist")
-		removeAutoScaler = true
+		return invalidAutoScalerErr
 	}
 
 	var k8sAutoScaler *autoscaling.HorizontalPodAutoscaler

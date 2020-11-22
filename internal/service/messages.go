@@ -15,7 +15,7 @@ const (
 
 func (s *Scheduler) handleMessage(ctx context.Context, m *queue.M) error {
 	switch m.Command {
-	case CommandDeployNamespace:
+	case queue.CommandDeployNamespace, queue.CommandRestartNamespace:
 		return s.deployNamespace(ctx, m)
 	default:
 		return errors.Wrapf("unrecognized command: %s", m.Command)
