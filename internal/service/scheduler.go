@@ -23,10 +23,6 @@ import (
 	"gitlab.unanet.io/devops/eve-sch/internal/vault"
 )
 
-const (
-	CommandDeployNamespace string = "sch-deploy-namespace"
-)
-
 type QueueWorker interface {
 	Start(queue.Handler)
 	Stop()

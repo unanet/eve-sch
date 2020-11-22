@@ -72,16 +72,8 @@ func deployAnnotations(port int) map[string]string {
 
 // { "limit": { "cpu": "1000m", "memory": "3000Mi" }, "request": { "cpu": "250m", "memory": "2000Mi" } }
 func (s *Scheduler) parsePodResource(ctx context.Context, input []byte) (*PodResource, error) {
-	if input == nil || len(input) < 2 {
+	if input == nil || len(input) < 2 || (len(input) == 2 && (string(input[0]) != "{" || string(input[1]) != "}")) {
 		s.Logger(ctx).Warn("invalid pod resource input", zap.ByteString("pod_resource", input))
-		return nil, nil
-	}
-	if len(input) == 2 {
-		if string(input[0]) == "{" && string(input[1]) == "}" {
-			s.Logger(ctx).Debug("{} pod resource default", zap.ByteString("pod_resource", input))
-		} else {
-			s.Logger(ctx).Error("invalid pod resource input", zap.ByteString("pod_resource", input))
-		}
 		return nil, nil
 	}
 	var podResource PodResource
@@ -91,7 +83,6 @@ func (s *Scheduler) parsePodResource(ctx context.Context, input []byte) (*PodRes
 	}
 
 	if podResource.IsDefault() {
-		s.Logger(ctx).Debug("default {} pod resource values", zap.ByteString("pod_resource", input))
 		return nil, nil
 	}
 
@@ -141,11 +132,11 @@ func (s *Scheduler) setupK8sDeployment(ctx context.Context, k8s *kubernetes.Clie
 		return errors.Wrap(err, "failed to hydrate the k8s deployment object")
 	}
 
-	_, err = k8s.AppsV1().Deployments(plan.Namespace.Name).Get(ctx, service.ServiceName, metav1.GetOptions{})
+	existingDeployment, err := k8s.AppsV1().Deployments(plan.Namespace.Name).Get(ctx, service.ServiceName, metav1.GetOptions{})
 	if err != nil {
 		if k8sErrors.IsNotFound(err) {
 			// This app hasn't been deployed yet so we need to deploy it
-			if _, err := k8s.AppsV1().Deployments(plan.Namespace.Name).Create(ctx, newDeployment, metav1.CreateOptions{}); err != nil {
+			if _, err = k8s.AppsV1().Deployments(plan.Namespace.Name).Create(ctx, newDeployment, metav1.CreateOptions{}); err != nil {
 				return errors.Wrap(err, "an error occurred trying to create the deployment")
 			}
 			return nil
@@ -153,10 +144,23 @@ func (s *Scheduler) setupK8sDeployment(ctx context.Context, k8s *kubernetes.Clie
 		// an error occurred trying to see if the app is already deployed
 		return errors.Wrap(err, "an error occurred trying to check for the deployment")
 	}
-	// we were able to retrieve the app which mean we need to run update instead of create
-	if _, err = k8s.AppsV1().Deployments(plan.Namespace.Name).Update(ctx, newDeployment, metav1.UpdateOptions{TypeMeta: deploymentMetaData}); err != nil {
-		return errors.Wrap(err, "an error occurred trying to update the deployment")
+
+	// Restart existing Deployment
+	if plan.Type == eve.DeploymentPlanTypeRestart {
+		if existingDeployment.Spec.Template.ObjectMeta.Labels == nil {
+			existingDeployment.Spec.Template.ObjectMeta.Labels = make(map[string]string)
+		}
+		existingDeployment.Spec.Template.ObjectMeta.Labels["nuance"] = timeNuance
+		if _, err = k8s.AppsV1().Deployments(plan.Namespace.Name).Update(ctx, existingDeployment, metav1.UpdateOptions{TypeMeta: deploymentMetaData}); err != nil {
+			return errors.Wrap(err, "an error occurred trying to restart the existing deployment")
+		}
+	} else {
+		// we were able to retrieve the app which mean we need to run update instead of create
+		if _, err = k8s.AppsV1().Deployments(plan.Namespace.Name).Update(ctx, newDeployment, metav1.UpdateOptions{TypeMeta: deploymentMetaData}); err != nil {
+			return errors.Wrap(err, "an error occurred trying to update the deployment")
+		}
 	}
+
 	return nil
 }
 
