@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -110,8 +112,8 @@ func (s *Scheduler) gracefulShutdown() {
 	close(s.done)
 }
 
-func (s *Scheduler) failAndLogFn(ctx context.Context, optName string, service *eve.DeployArtifact, plan *eve.NSDeploymentPlan) func(err error, format string, a ...interface{}) {
-	return func(err error, format string, a ...interface{}) {
+func (s *Scheduler) logMessageFn(optName string, service *eve.DeployArtifact, plan *eve.NSDeploymentPlan) func(format string, a ...interface{}) {
+	return func(format string, a ...interface{}) {
 		if len(optName) == 0 {
 			format = format + " [artifact:%s]"
 			a = append(a, service.ArtifactName)
@@ -121,6 +123,13 @@ func (s *Scheduler) failAndLogFn(ctx context.Context, optName string, service *e
 		}
 
 		plan.Message(format, a...)
+	}
+}
+
+func (s *Scheduler) failAndLogFn(ctx context.Context, optName string, service *eve.DeployArtifact, plan *eve.NSDeploymentPlan) func(err error, format string, a ...interface{}) {
+	logFn := s.logMessageFn(optName, service, plan)
+	return func(err error, format string, a ...interface{}) {
+		logFn(format, a...)
 		service.Result = eve.DeployArtifactResultFailed
 
 		if err != nil {
@@ -129,6 +138,63 @@ func (s *Scheduler) failAndLogFn(ctx context.Context, optName string, service *e
 			s.Logger(ctx).Warn(fmt.Sprintf(format, a...), zap.String("artifact", service.ArtifactName), zap.String("deploy_name", optName))
 		}
 	}
+}
+
+func intContains(s []int, e int) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
+}
+
+func expandSuccessExitCodes(successExitCodes string) ([]int, error) {
+	var r []int
+	var last int
+	for _, part := range strings.Split(successExitCodes, ",") {
+		if i := strings.Index(part[1:], "-"); i == -1 {
+			n, err := strconv.Atoi(part)
+			if err != nil {
+				return nil, fmt.Errorf("success_exit_code parse error, parts are not a valid int: %s", err.Error())
+			}
+			if len(r) > 0 {
+				if last == n {
+
+					return nil, fmt.Errorf("success_exit_code parse error, duplicate value: %d", n)
+				} else if last > n {
+					return nil, fmt.Errorf("success_exit_code parse error, values not ordered: %d", n)
+				}
+			}
+			r = append(r, n)
+			last = n
+		} else {
+			n1, err := strconv.Atoi(part[:i+1])
+			if err != nil {
+				return nil, fmt.Errorf("success_exit_code parse error, parts are not a valid int: %s", err.Error())
+			}
+			n2, err := strconv.Atoi(part[i+2:])
+			if err != nil {
+				return nil, fmt.Errorf("success_exit_code parse error, parts are not a valid int: %s", err.Error())
+			}
+			if n2 < n1+2 {
+				return nil, fmt.Errorf("success_exit_code parse error, invalid range: %s", part)
+			}
+			if len(r) > 0 {
+				if last == n1 {
+					return nil, fmt.Errorf("success_exit_code parse error, duplicate value: %d", n1)
+				} else if last > n1 {
+					return nil, fmt.Errorf("success_exit_code parse error, values not ordered: %d", n1)
+				}
+			}
+			for i = n1; i <= n2; i++ {
+				r = append(r, i)
+			}
+			last = n2
+		}
+	}
+
+	return r, nil
 }
 
 func getK8sClient() (*kubernetes.Clientset, error) {

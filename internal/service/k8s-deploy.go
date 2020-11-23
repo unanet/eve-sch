@@ -295,7 +295,6 @@ func (s *Scheduler) watchPods(
 	service *eve.DeployService,
 	timeNuance string,
 ) error {
-	failNLog := s.failAndLogFn(ctx, service.ServiceName, service.DeployArtifact, plan)
 	pods := k8s.CoreV1().Pods(plan.Namespace.Name)
 	watch, err := pods.Watch(ctx, metav1.ListOptions{
 		TypeMeta:       metav1.TypeMeta{},
@@ -314,7 +313,7 @@ func (s *Scheduler) watchPods(
 		}
 		for _, x := range p.Status.ContainerStatuses {
 			if x.LastTerminationState.Terminated != nil {
-				failNLog(nil, "pod failed to start and returned a non zero exit code: %d", x.LastTerminationState.Terminated.ExitCode)
+				service.ExitCode = int(x.LastTerminationState.Terminated.ExitCode)
 				watch.Stop()
 				return nil
 			}
@@ -334,6 +333,7 @@ func (s *Scheduler) watchPods(
 
 func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.DeployService, plan *eve.NSDeploymentPlan) {
 	failNLog := s.failAndLogFn(ctx, service.ServiceName, service.DeployArtifact, plan)
+	logFn := s.logMessageFn(service.ServiceName, service.DeployArtifact, plan)
 	k8s, err := getK8sClient()
 	if err != nil {
 		failNLog(err, "an error occurred trying to get the k8s client")
@@ -361,5 +361,22 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 		failNLog(err, "an error occurred while setting up k8s horizontal pod autoscaler")
 		return
 	}
-	service.Result = eve.DeployArtifactResultSuccess
+
+	if service.ExitCode != 0 {
+		logFn("pod failed to start and returned a non zero exit code: %d", service.ExitCode)
+		validExitCodes, err := expandSuccessExitCodes(service.SuccessExitCodes)
+		if err != nil {
+			failNLog(err, "an error occurred parsing valid exit codes for the service")
+			return
+		}
+
+		if !intContains(validExitCodes, service.ExitCode) {
+			service.Result = eve.DeployArtifactResultFailed
+		}
+	}
+
+	// if we've set it to a failure above somewhere, we don't want to now state it's succeeded.
+	if service.Result == eve.DeployArtifactResultNoop {
+		service.Result = eve.DeployArtifactResultSuccess
+	}
 }
