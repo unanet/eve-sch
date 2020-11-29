@@ -152,11 +152,11 @@ func (s *Scheduler) setupK8sDeployment(ctx context.Context, k8s *kubernetes.Clie
 	return nil
 }
 
-func labelSelector(service *eve.DeployService, timeNuance string) string {
+func deploymentLabelSelector(service *eve.DeployService, timeNuance string) string {
 	return fmt.Sprintf("app=%s,version=%s,nuance=%s", service.ServiceName, service.AvailableVersion, timeNuance)
 }
 
-func matchLabels(service *eve.DeployService, timeNuance string) map[string]string {
+func deploymentMatchLabels(service *eve.DeployService, timeNuance string) map[string]string {
 	return map[string]string{
 		"app":     service.ServiceName,
 		"version": service.AvailableVersion,
@@ -181,7 +181,7 @@ func (s *Scheduler) hydrateK8sDeployment(ctx context.Context, plan *eve.NSDeploy
 			},
 			Template: apiv1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels:      matchLabels(service, nuance),
+					Labels:      deploymentMatchLabels(service, nuance),
 					Annotations: deployAnnotations(service.MetricsPort),
 				},
 				Spec: apiv1.PodSpec{
@@ -275,7 +275,7 @@ func getContainerPorts(service *eve.DeployService) []apiv1.ContainerPort {
 	return result
 }
 
-func (s *Scheduler) watchPods(
+func (s *Scheduler) watchServicePods(
 	ctx context.Context,
 	k8s *kubernetes.Clientset,
 	plan *eve.NSDeploymentPlan,
@@ -285,7 +285,7 @@ func (s *Scheduler) watchPods(
 	pods := k8s.CoreV1().Pods(plan.Namespace.Name)
 	watch, err := pods.Watch(ctx, metav1.ListOptions{
 		TypeMeta:       metav1.TypeMeta{},
-		LabelSelector:  labelSelector(service, timeNuance),
+		LabelSelector:  deploymentLabelSelector(service, timeNuance),
 		TimeoutSeconds: int64Ptr(config.GetConfig().K8sDeployTimeoutSec),
 	})
 	if err != nil {
@@ -339,8 +339,8 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 		return
 	}
 	// We wait/watch for 1 successful pod to come up
-	if err := s.watchPods(ctx, k8s, plan, service, timeNuance); err != nil {
-		failNLog(err, "an error occurred while watching k8s pods")
+	if err := s.watchServicePods(ctx, k8s, plan, service, timeNuance); err != nil {
+		failNLog(err, "an error occurred while watching k8s deployment pods")
 		return
 	}
 	// k8s autoscaler is optional

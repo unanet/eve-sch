@@ -4,13 +4,16 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/pkg/errors"
+
+	"k8s.io/client-go/kubernetes"
+
+	"gitlab.unanet.io/devops/eve-sch/internal/config"
 	"gitlab.unanet.io/devops/eve/pkg/eve"
 	batchv1 "k8s.io/api/batch/v1"
 	apiv1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"gitlab.unanet.io/devops/eve-sch/internal/config"
 )
 
 var (
@@ -20,6 +23,8 @@ var (
 	}
 )
 
+// TODO: Remove this once migrations are removed and we are full on "Job"
+//  this is still being used bu the k8s-migrations.go setup
 func setupJobEnvironment(metadata map[string]interface{}, job *batchv1.Job) {
 	var containerEnvVars []apiv1.EnvVar
 
@@ -37,67 +42,105 @@ func setupJobEnvironment(metadata map[string]interface{}, job *batchv1.Job) {
 	job.Spec.Template.Spec.Containers[0].Env = containerEnvVars
 }
 
-func (s *Scheduler) runDockerJob(ctx context.Context, job *eve.DeployJob, plan *eve.NSDeploymentPlan) {
-	fail := s.failAndLogFn(ctx, job.JobName, job.DeployArtifact, plan)
+func (s *Scheduler) hydrateK8sJob(ctx context.Context, plan *eve.NSDeploymentPlan, job *eve.DeployJob) (*batchv1.Job, error) {
+	return &batchv1.Job{
+		TypeMeta: jobMetaData,
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      job.JobName,
+			Namespace: plan.Namespace.Name,
+		},
+		Spec: batchv1.JobSpec{
+			BackoffLimit: int32Ptr(0),
+			Template: apiv1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"job":     job.JobName,
+						"version": job.AvailableVersion,
+					},
+				},
+				Spec: apiv1.PodSpec{
+					RestartPolicy: apiv1.RestartPolicyNever,
+					SecurityContext: &apiv1.PodSecurityContext{
+						RunAsUser:  int64Ptr(int64(job.RunAs)),
+						RunAsGroup: int64Ptr(int64(job.RunAs)),
+						FSGroup:    int64Ptr(65534),
+					},
+					ServiceAccountName: job.ServiceAccount,
+					Containers: []apiv1.Container{
+						{
+							Name:            job.ArtifactName,
+							ImagePullPolicy: apiv1.PullAlways,
+							Image:           getDockerImageName(job.DeployArtifact),
+							Env:             containerEnvVars(job.Metadata),
+						},
+					},
+					ImagePullSecrets: imagePullSecrets,
+				},
+			},
+		},
+	}, nil
+}
 
-	k8s, err := getK8sClient()
+func jobLabelSelector(job *eve.DeployJob) string {
+	return fmt.Sprintf("job=%s", job.JobName)
+}
 
+func (s *Scheduler) setupK8sJob(ctx context.Context, k8s *kubernetes.Clientset, plan *eve.NSDeploymentPlan, job *eve.DeployJob) error {
+	newJob, err := s.hydrateK8sJob(ctx, plan, job)
 	if err != nil {
-		fail(err, "an error occurred trying to get the k8s client")
-		return
+		return errors.Wrap(err, "failed to hydrate the k8s job object")
 	}
-
-	labelSelector := fmt.Sprintf("job=%s", job.JobName)
-	imageName := getDockerImageName(job.DeployArtifact)
-	k8sJob := getK8sJob(
-		job.JobName,
-		plan.Namespace.Name,
-		job.ServiceAccount,
-		job.ArtifactName,
-		imageName,
-		job.AvailableVersion,
-		job.RunAs)
-	setupJobEnvironment(job.Metadata, k8sJob)
 
 	_, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Get(ctx, job.JobName, metav1.GetOptions{})
-	if k8sErrors.IsNotFound(err) {
-		_, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Create(ctx, k8sJob, metav1.CreateOptions{})
-		if err != nil {
-			fail(err, "an error occurred trying to create the job", job.JobName)
-			return
-		}
-	} else if err == nil {
-		existingPods, err := k8s.CoreV1().Pods(plan.Namespace.Name).List(ctx, metav1.ListOptions{
-			TypeMeta:      metav1.TypeMeta{},
-			LabelSelector: labelSelector,
-		})
-		if err == nil {
-			for _, x := range existingPods.Items {
-				_ = k8s.CoreV1().Pods(plan.Namespace.Name).Delete(ctx, x.Name, metav1.DeleteOptions{})
+	if err != nil {
+		if k8sErrors.IsNotFound(err) {
+			if _, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Create(ctx, newJob, metav1.CreateOptions{}); err != nil {
+				return errors.Wrap(err, "an error occurred trying to create the job")
 			}
+			// Successfully created the job
+			return nil
 		}
-		_, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Update(ctx, k8sJob, metav1.UpdateOptions{
-			TypeMeta: jobMetaData,
-		})
-		if err != nil {
-			fail(err, "an error occurred trying to update the job")
-			return
-		}
-	} else {
-		fail(err, "an error occurred trying to see if the job exists", job.JobName)
-		return
+		// an error occurred trying to see if the job is already deployed
+		return errors.Wrap(err, "an error occurred trying to get the job")
 	}
 
-	watchPods := k8s.CoreV1().Pods(plan.Namespace.Name)
-	watch, err := watchPods.Watch(ctx, metav1.ListOptions{
+	// Ok, the job already exists, so we need to cleanup first
+	existingPods, err := k8s.CoreV1().Pods(plan.Namespace.Name).List(ctx, metav1.ListOptions{
+		TypeMeta:      metav1.TypeMeta{},
+		LabelSelector: jobLabelSelector(job),
+	})
+	if err == nil {
+		for _, x := range existingPods.Items {
+			_ = k8s.CoreV1().Pods(plan.Namespace.Name).Delete(ctx, x.Name, metav1.DeleteOptions{})
+		}
+	}
+
+	// Now let's update the existing deployment
+	_, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Update(ctx, newJob, metav1.UpdateOptions{
+		TypeMeta: jobMetaData,
+	})
+	if err != nil {
+		return errors.Wrap(err, "an error occurred trying to update the job")
+	}
+	return nil
+}
+
+func (s *Scheduler) watchJobPods(
+	ctx context.Context,
+	k8s *kubernetes.Clientset,
+	plan *eve.NSDeploymentPlan,
+	job *eve.DeployJob,
+) error {
+	pods := k8s.CoreV1().Pods(plan.Namespace.Name)
+	watch, err := pods.Watch(ctx, metav1.ListOptions{
 		TypeMeta:       metav1.TypeMeta{},
-		LabelSelector:  labelSelector,
+		LabelSelector:  jobLabelSelector(job),
 		TimeoutSeconds: int64Ptr(config.GetConfig().K8sDeployTimeoutSec),
 	})
 	if err != nil {
-		fail(err, "an error occurred trying to watch the pod, job may have succeeded")
-		return
+		return errors.Wrap(err, "an error occurred trying to watch the pods, deployment may have succeeded")
 	}
+	started := make(map[string]bool)
 
 	for event := range watch.ResultChan() {
 		p, ok := event.Object.(*apiv1.Pod)
@@ -105,82 +148,61 @@ func (s *Scheduler) runDockerJob(ctx context.Context, job *eve.DeployJob, plan *
 			continue
 		}
 		for _, x := range p.Status.ContainerStatuses {
-			if x.State.Terminated == nil {
+			if x.LastTerminationState.Terminated != nil {
+				job.ExitCode = int(x.LastTerminationState.Terminated.ExitCode)
+				watch.Stop()
+				return nil
+			}
+
+			if !x.Ready {
 				continue
 			}
-			watch.Stop()
+			started[p.Name] = true
+		}
 
-			if x.State.Terminated.ExitCode != 0 {
-				job.Result = eve.DeployArtifactResultFailed
-				plan.Message("job failed, exit code: %d, job: %s", x.State.Terminated.ExitCode, job.JobName)
-				return
-			}
+		if len(started) >= 1 {
+			watch.Stop()
 		}
 	}
+	return nil
+}
 
-	// make sure we don't get a false positive and actually check
-	pods, err := k8s.CoreV1().Pods(plan.Namespace.Name).List(ctx, metav1.ListOptions{
-		LabelSelector: labelSelector,
-	})
+func (s *Scheduler) runDockerJob(ctx context.Context, job *eve.DeployJob, plan *eve.NSDeploymentPlan) {
+	fail := s.failAndLogFn(ctx, job.JobName, job.DeployArtifact, plan)
+	logFn := s.logMessageFn(job.JobName, job.DeployArtifact, plan)
+	k8s, err := getK8sClient()
 	if err != nil {
-		fail(nil, "an error occurred while trying to run job: %s, timed out waiting for job to finish.", job.JobName)
+		fail(err, "an error occurred trying to get the k8s client")
 		return
 	}
 
-	for _, x := range pods.Items {
-		if x.Status.ContainerStatuses[0].State.Terminated == nil {
-			fail(nil, "an error occurred while trying to run job: %s, timed out waiting for job to finish.", job.JobName)
+	// Setup the K8s Job
+	if err := s.setupK8sJob(ctx, k8s, plan, job); err != nil {
+		fail(err, "an error occurred setting up the k8s job")
+		return
+	}
+
+	// Let's watch the pods for results
+	if err := s.watchJobPods(ctx, k8s, plan, job); err != nil {
+		fail(err, "an error occurred while watching k8s job pods")
+		return
+	}
+
+	if job.ExitCode != 0 {
+		logFn("pod failed to start and returned a non zero exit code: %d", job.ExitCode)
+		validExitCodes, err := expandSuccessExitCodes(job.SuccessExitCodes)
+		if err != nil {
+			fail(err, "an error occurred parsing valid exit codes for the service")
 			return
 		}
 
-		if x.Status.ContainerStatuses[0].State.Terminated.ExitCode != 0 {
-			fail(nil, "an error occurred while trying to run job: %s, exit code: %d", job.JobName, x.Status.ContainerStatuses[0].State.Terminated.ExitCode)
-			return
+		if !intContains(validExitCodes, job.ExitCode) {
+			job.Result = eve.DeployArtifactResultFailed
 		}
 	}
 
-	job.Result = eve.DeployArtifactResultSuccess
-}
-
-func getK8sJob(
-	jobName,
-	namespace,
-	serviceAccountName,
-	artifactName,
-	containerImage,
-	artifactVersion string, runAs int) *batchv1.Job {
-	return &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      jobName,
-			Namespace: namespace,
-		},
-		Spec: batchv1.JobSpec{
-			BackoffLimit: int32Ptr(0),
-			Template: apiv1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"job":     jobName,
-						"version": artifactVersion,
-					},
-				},
-				Spec: apiv1.PodSpec{
-					RestartPolicy: apiv1.RestartPolicyNever,
-					SecurityContext: &apiv1.PodSecurityContext{
-						RunAsUser:  int64Ptr(int64(runAs)),
-						RunAsGroup: int64Ptr(int64(runAs)),
-						FSGroup:    int64Ptr(65534),
-					},
-					ServiceAccountName: serviceAccountName,
-					Containers: []apiv1.Container{
-						{
-							Name:            artifactName,
-							ImagePullPolicy: apiv1.PullAlways,
-							Image:           containerImage,
-						},
-					},
-					ImagePullSecrets: imagePullSecrets,
-				},
-			},
-		},
+	// if we've set it to a failure above somewhere, we don't want to now state it's succeeded.
+	if job.Result == eve.DeployArtifactResultNoop {
+		job.Result = eve.DeployArtifactResultSuccess
 	}
 }
