@@ -13,6 +13,13 @@ import (
 	"gitlab.unanet.io/devops/eve-sch/internal/config"
 )
 
+var (
+	jobMetaData = metav1.TypeMeta{
+		Kind:       "Job",
+		APIVersion: "batch/v1",
+	}
+)
+
 func setupJobEnvironment(metadata map[string]interface{}, job *batchv1.Job) {
 	var containerEnvVars []apiv1.EnvVar
 
@@ -69,7 +76,9 @@ func (s *Scheduler) runDockerJob(ctx context.Context, job *eve.DeployJob, plan *
 				_ = k8s.CoreV1().Pods(plan.Namespace.Name).Delete(ctx, x.Name, metav1.DeleteOptions{})
 			}
 		}
-		_, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Update(ctx, k8sJob, metav1.UpdateOptions{})
+		_, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Update(ctx, k8sJob, metav1.UpdateOptions{
+			TypeMeta: jobMetaData,
+		})
 		if err != nil {
 			fail(err, "an error occurred trying to update the job")
 			return

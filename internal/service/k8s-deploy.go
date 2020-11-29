@@ -97,19 +97,7 @@ func (s *Scheduler) parsePodResource(ctx context.Context, input []byte) (*PodRes
 	return &podResource, nil
 }
 
-func (s *Scheduler) ParseResourceRequirements(ctx context.Context, input []byte) (apiv1.ResourceList, error) {
-	if len(input) <= 5 {
-		return nil, nil
-	}
-	var result apiv1.ResourceList
-	if err := json.Unmarshal(input, &result); err != nil {
-		s.Logger(ctx).Warn("failed to unmarshal the resource requirement", zap.Error(err))
-		return nil, err
-	}
-	return result, nil
-}
-
-func (s *Scheduler) ParseProbe(ctx context.Context, input []byte) (*apiv1.Probe, error) {
+func (s *Scheduler) parseProbe(ctx context.Context, input []byte) (*apiv1.Probe, error) {
 	if len(input) <= 5 {
 		return nil, nil
 	}
@@ -220,7 +208,7 @@ func (s *Scheduler) hydrateK8sDeployment(ctx context.Context, plan *eve.NSDeploy
 	}
 
 	// Setup the Probes
-	readinessProbe, err := s.ParseProbe(ctx, service.ReadinessProbe)
+	readinessProbe, err := s.parseProbe(ctx, service.ReadinessProbe)
 	if err != nil {
 		return nil, err
 	}
@@ -228,7 +216,7 @@ func (s *Scheduler) hydrateK8sDeployment(ctx context.Context, plan *eve.NSDeploy
 		deployment.Spec.Template.Spec.Containers[0].ReadinessProbe = readinessProbe
 	}
 
-	livelinessProbe, err := s.ParseProbe(ctx, service.LivelinessProbe)
+	livelinessProbe, err := s.parseProbe(ctx, service.LivelinessProbe)
 	if err != nil {
 		return nil, err
 	}
@@ -241,7 +229,6 @@ func (s *Scheduler) hydrateK8sDeployment(ctx context.Context, plan *eve.NSDeploy
 	if err != nil {
 		return nil, err
 	}
-
 	if podResource != nil {
 		deployment.Spec.Template.Spec.Containers[0].Resources = apiv1.ResourceRequirements{
 			Requests: podResource.Request,
