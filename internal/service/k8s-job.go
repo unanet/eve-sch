@@ -42,6 +42,17 @@ func setupJobEnvironment(metadata map[string]interface{}, job *batchv1.Job) {
 	job.Spec.Template.Spec.Containers[0].Env = containerEnvVars
 }
 
+func jobLabelSelector(job *eve.DeployJob) string {
+	return fmt.Sprintf("job=%s,version=%s", job.JobName, job.AvailableVersion)
+}
+
+func jobMatchLabels(job *eve.DeployJob) map[string]string {
+	return map[string]string{
+		"job":     job.JobName,
+		"version": job.AvailableVersion,
+	}
+}
+
 func (s *Scheduler) hydrateK8sJob(ctx context.Context, plan *eve.NSDeploymentPlan, job *eve.DeployJob) (*batchv1.Job, error) {
 	return &batchv1.Job{
 		TypeMeta: jobMetaData,
@@ -51,12 +62,14 @@ func (s *Scheduler) hydrateK8sJob(ctx context.Context, plan *eve.NSDeploymentPla
 		},
 		Spec: batchv1.JobSpec{
 			BackoffLimit: int32Ptr(0),
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"job": job.JobName,
+				},
+			},
 			Template: apiv1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"job":     job.JobName,
-						"version": job.AvailableVersion,
-					},
+					Labels: jobMatchLabels(job),
 				},
 				Spec: apiv1.PodSpec{
 					RestartPolicy: apiv1.RestartPolicyNever,
@@ -79,10 +92,6 @@ func (s *Scheduler) hydrateK8sJob(ctx context.Context, plan *eve.NSDeploymentPla
 			},
 		},
 	}, nil
-}
-
-func jobLabelSelector(job *eve.DeployJob) string {
-	return fmt.Sprintf("job=%s", job.JobName)
 }
 
 func (s *Scheduler) setupK8sJob(ctx context.Context, k8s *kubernetes.Clientset, plan *eve.NSDeploymentPlan, job *eve.DeployJob) error {
