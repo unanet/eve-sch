@@ -62,11 +62,6 @@ func (s *Scheduler) hydrateK8sJob(ctx context.Context, plan *eve.NSDeploymentPla
 		},
 		Spec: batchv1.JobSpec{
 			BackoffLimit: int32Ptr(0),
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					"job": job.JobName,
-				},
-			},
 			Template: apiv1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: jobMatchLabels(job),
