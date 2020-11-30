@@ -63,10 +63,10 @@ func (s *Scheduler) setupK8sService(
 			if k8sErrors.IsNotFound(err) {
 				_, err := k8s.CoreV1().Services(plan.Namespace.Name).Create(ctx, k8sSvc, metav1.CreateOptions{})
 				if err != nil {
-					return errors.Wrap(err, "an error occurred trying to create the service")
+					return errors.Wrap(err, "an error occurred trying to create the k8s service")
 				}
 			} else {
-				return errors.Wrap(err, "an error occurred trying to check for the service")
+				return errors.Wrap(err, "an error occurred trying to get the k8s service")
 			}
 		}
 	}
