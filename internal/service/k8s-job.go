@@ -12,7 +12,6 @@ import (
 	"gitlab.unanet.io/devops/eve/pkg/eve"
 	batchv1 "k8s.io/api/batch/v1"
 	apiv1 "k8s.io/api/core/v1"
-	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -43,7 +42,7 @@ func setupJobEnvironment(metadata map[string]interface{}, job *batchv1.Job) {
 }
 
 func jobLabelSelector(job *eve.DeployJob) string {
-	return fmt.Sprintf("job=%s,version=%s", job.JobName, job.AvailableVersion)
+	return fmt.Sprintf("job=%s", job.JobName)
 }
 
 func jobMatchLabels(job *eve.DeployJob) map[string]string {
@@ -95,20 +94,9 @@ func (s *Scheduler) setupK8sJob(ctx context.Context, k8s *kubernetes.Clientset, 
 		return errors.Wrap(err, "failed to hydrate the k8s job object")
 	}
 
-	_, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Get(ctx, job.JobName, metav1.GetOptions{})
-	if err != nil {
-		if k8sErrors.IsNotFound(err) {
-			if _, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Create(ctx, newJob, metav1.CreateOptions{}); err != nil {
-				return errors.Wrap(err, "an error occurred trying to create the job")
-			}
-			// Successfully created the job
-			return nil
-		}
-		// an error occurred trying to see if the job is already deployed
-		return errors.Wrap(err, "an error occurred trying to get the job")
-	}
+	// Delete the Job if it exists (swallow the error)
+	_ = k8s.BatchV1().Jobs(plan.Namespace.Name).Delete(ctx, job.JobName, metav1.DeleteOptions{})
 
-	// Ok, the job already exists, so we need to cleanup first
 	existingPods, err := k8s.CoreV1().Pods(plan.Namespace.Name).List(ctx, metav1.ListOptions{
 		TypeMeta:      metav1.TypeMeta{},
 		LabelSelector: jobLabelSelector(job),
@@ -119,12 +107,8 @@ func (s *Scheduler) setupK8sJob(ctx context.Context, k8s *kubernetes.Clientset, 
 		}
 	}
 
-	// Now let's update the existing deployment
-	_, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Update(ctx, newJob, metav1.UpdateOptions{
-		TypeMeta: jobMetaData,
-	})
-	if err != nil {
-		return errors.Wrap(err, "an error occurred trying to update the job")
+	if _, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Create(ctx, newJob, metav1.CreateOptions{}); err != nil {
+		return errors.Wrap(err, "an error occurred trying to create the job")
 	}
 	return nil
 }
