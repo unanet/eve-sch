@@ -196,7 +196,7 @@ func (s *Scheduler) hydrateK8sDeployment(ctx context.Context, plan *eve.NSDeploy
 							Name:            service.ArtifactName,
 							ImagePullPolicy: apiv1.PullAlways,
 							Image:           getDockerImageName(service.DeployArtifact),
-							Ports:           getContainerPorts(service),
+							Ports:           getServiceContainerPorts(service),
 							Env:             containerEnvVars(service.Metadata),
 						},
 					},
@@ -254,7 +254,7 @@ func (s *Scheduler) hydrateK8sDeployment(ctx context.Context, plan *eve.NSDeploy
 	return deployment, nil
 }
 
-func getContainerPorts(service *eve.DeployService) []apiv1.ContainerPort {
+func getServiceContainerPorts(service *eve.DeployService) []apiv1.ContainerPort {
 	var result []apiv1.ContainerPort
 	// Setup the Service Port
 	if service.ServicePort != 0 {

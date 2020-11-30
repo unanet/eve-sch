@@ -3,6 +3,9 @@ package service
 import (
 	"context"
 	"fmt"
+	"time"
+
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"github.com/pkg/errors"
 
@@ -89,26 +92,57 @@ func (s *Scheduler) hydrateK8sJob(ctx context.Context, plan *eve.NSDeploymentPla
 }
 
 func (s *Scheduler) setupK8sJob(ctx context.Context, k8s *kubernetes.Clientset, plan *eve.NSDeploymentPlan, job *eve.DeployJob) error {
+
 	newJob, err := s.hydrateK8sJob(ctx, plan, job)
 	if err != nil {
-		return errors.Wrap(err, "failed to hydrate the k8s job object")
+		return errors.Wrap(err, "failed to hydrate the k8s job")
 	}
 
-	// Delete the Job if it exists (swallow the error)
-	_ = k8s.BatchV1().Jobs(plan.Namespace.Name).Delete(ctx, job.JobName, metav1.DeleteOptions{})
+	if _, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Get(ctx, job.JobName, metav1.GetOptions{}); err != nil {
+		if k8sErrors.IsNotFound(err) {
+			// This job hasn't been deployed yet so we need to deploy it (create)
+			if _, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Create(ctx, newJob, metav1.CreateOptions{}); err != nil {
+				return errors.Wrap(err, "an error occurred trying to create the job")
+			}
+			return nil
+		}
+		// an error occurred trying to see if the app is already deployed
+		return errors.Wrap(err, "an error occurred trying to check for the deployment")
+	}
 
+	// OK A Job already exists. Let's cleanup the existing pods
 	existingPods, err := k8s.CoreV1().Pods(plan.Namespace.Name).List(ctx, metav1.ListOptions{
 		TypeMeta:      metav1.TypeMeta{},
 		LabelSelector: jobLabelSelector(job),
 	})
-	if err == nil {
+	if err == nil && existingPods != nil && len(existingPods.Items) > 0 {
 		for _, x := range existingPods.Items {
 			_ = k8s.CoreV1().Pods(plan.Namespace.Name).Delete(ctx, x.Name, metav1.DeleteOptions{})
 		}
 	}
 
-	if _, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Create(ctx, newJob, metav1.CreateOptions{}); err != nil {
-		return errors.Wrap(err, "an error occurred trying to create the job")
+	// TODO: We need to wrap this in a common retry/backoff pattern
+	for i := 1; i < 60; i++ {
+		time.Sleep(1 * time.Second)
+		existingPods, err := k8s.CoreV1().Pods(plan.Namespace.Name).List(ctx, metav1.ListOptions{
+			TypeMeta:      metav1.TypeMeta{},
+			LabelSelector: jobLabelSelector(job),
+		})
+		if err != nil {
+			return errors.Wrap(err, "an error occurred trying to wait for old migration jobs to be removed")
+		}
+		// All existing pods are gone...let's break
+		if len(existingPods.Items) == 0 {
+			break
+		}
+
+		if i == 59 {
+			return errors.Wrap(err, "waited 60 seconds for job pods to be removed but some still exist")
+		}
+	}
+
+	if _, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Update(ctx, newJob, metav1.UpdateOptions{TypeMeta: jobMetaData}); err != nil {
+		return errors.Wrap(err, "an error occurred trying to update the existing job")
 	}
 	return nil
 }
