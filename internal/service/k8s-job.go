@@ -186,7 +186,9 @@ func (s *Scheduler) watchJobPods(
 		if !ok {
 			continue
 		}
+		log.Logger.Info("TROY POD Event", zap.Any("container status", p))
 		for _, x := range p.Status.ContainerStatuses {
+			log.Logger.Info("TROY Container Status", zap.Any("container status", x))
 			if x.LastTerminationState.Terminated != nil {
 				job.ExitCode = int(x.LastTerminationState.Terminated.ExitCode)
 				watch.Stop()
