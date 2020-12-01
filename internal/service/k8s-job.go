@@ -103,7 +103,8 @@ func (s *Scheduler) setupK8sJob(ctx context.Context, k8s *kubernetes.Clientset, 
 		return errors.Wrap(err, "failed to hydrate the k8s job")
 	}
 
-	if _, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Get(ctx, job.JobName, metav1.GetOptions{}); err != nil {
+	existingJob, err := k8s.BatchV1().Jobs(plan.Namespace.Name).Get(ctx, job.JobName, metav1.GetOptions{})
+	if err != nil {
 		if k8sErrors.IsNotFound(err) {
 			// This job hasn't been deployed yet so we need to deploy it (create)
 			if _, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Create(ctx, newJob, metav1.CreateOptions{}); err != nil {
@@ -146,6 +147,7 @@ func (s *Scheduler) setupK8sJob(ctx context.Context, k8s *kubernetes.Clientset, 
 		}
 	}
 
+	newJob.Spec.Selector = existingJob.Spec.Selector
 	if _, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Update(ctx, newJob, metav1.UpdateOptions{TypeMeta: jobMetaData}); err != nil {
 		return errors.Wrap(err, "an error occurred trying to update the existing job")
 	}
