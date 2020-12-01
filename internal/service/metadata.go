@@ -59,7 +59,7 @@ func ParseServiceMetadata(metadata map[string]interface{}, service *eve.DeploySe
 		return nil, err
 	}
 
-	return returnMap, nil
+	return overrideMetaData(returnMap, plan.MetadataOverrides), nil
 }
 
 func ParseMigrationMetadata(metadata map[string]interface{}, migration *eve.DeployMigration, plan *eve.NSDeploymentPlan) (map[string]interface{}, error) {
@@ -88,7 +88,16 @@ func ParseMigrationMetadata(metadata map[string]interface{}, migration *eve.Depl
 		return nil, err
 	}
 
-	return returnMap, nil
+	return overrideMetaData(returnMap, plan.MetadataOverrides), nil
+}
+
+func overrideMetaData(m map[string]interface{}, overrides eve.MetadataField) map[string]interface{} {
+	if overrides != nil && len(overrides) > 0 {
+		for k, v := range overrides {
+			m[k] = v
+		}
+	}
+	return m
 }
 
 func ParseJobMetadata(metadata map[string]interface{}, job *eve.DeployJob, plan *eve.NSDeploymentPlan) (map[string]interface{}, error) {
@@ -117,5 +126,5 @@ func ParseJobMetadata(metadata map[string]interface{}, job *eve.DeployJob, plan 
 		return nil, err
 	}
 
-	return returnMap, nil
+	return overrideMetaData(returnMap, plan.MetadataOverrides), nil
 }
