@@ -50,8 +50,9 @@ func jobLabelSelector(job *eve.DeployJob) string {
 
 func jobMatchLabels(job *eve.DeployJob) map[string]string {
 	return map[string]string{
-		"job":     job.JobName,
-		"version": job.AvailableVersion,
+		"job":      job.JobName,
+		"job-name": job.JobName,
+		"version":  job.AvailableVersion,
 	}
 }
 
