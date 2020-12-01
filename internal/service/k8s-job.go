@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"gitlab.unanet.io/devops/eve/pkg/log"
+	"go.uber.org/zap"
+
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"github.com/pkg/errors"
@@ -147,6 +150,10 @@ func (s *Scheduler) setupK8sJob(ctx context.Context, k8s *kubernetes.Clientset, 
 			return errors.Wrap(err, "waited 60 seconds for job pods to be removed but some still exist")
 		}
 	}
+
+	log.Logger.Info("TROY", zap.Any("selector", existingJob.Spec.Selector))
+	log.Logger.Info("TROY", zap.Any("ObjectMeta.Labels", existingJob.ObjectMeta.Labels))
+	log.Logger.Info("TROY", zap.Any("Template.ObjectMeta.Labels", existingJob.Spec.Template.ObjectMeta.Labels))
 
 	newJob.Spec.Selector = existingJob.Spec.Selector
 	newJob.ObjectMeta.Labels = existingJob.ObjectMeta.Labels
