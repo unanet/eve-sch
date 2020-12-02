@@ -151,13 +151,18 @@ func (s *Scheduler) setupK8sJob(ctx context.Context, k8s *kubernetes.Clientset, 
 		}
 	}
 
-	log.Logger.Info("TROY", zap.Any("selector", existingJob.Spec.Selector))
-	log.Logger.Info("TROY", zap.Any("ObjectMeta.Labels", existingJob.ObjectMeta.Labels))
-	log.Logger.Info("TROY", zap.Any("Template.ObjectMeta.Labels", existingJob.Spec.Template.ObjectMeta.Labels))
+	log.Logger.Info("TROY", zap.Any("existingJob selector", existingJob.Spec.Selector))
+	log.Logger.Info("TROY", zap.Any("existingJob ObjectMeta.Labels", existingJob.ObjectMeta.Labels))
+	log.Logger.Info("TROY", zap.Any("existingJob Template.ObjectMeta.Labels", existingJob.Spec.Template.ObjectMeta.Labels))
 
 	newJob.Spec.Selector = existingJob.Spec.Selector
 	//newJob.ObjectMeta.Labels = existingJob.ObjectMeta.Labels
 	//newJob.Spec.Template.ObjectMeta.Labels = existingJob.Spec.Template.ObjectMeta.Labels
+
+	log.Logger.Info("TROY", zap.Any("newJob selector", newJob.Spec.Selector))
+	log.Logger.Info("TROY", zap.Any("newJob ObjectMeta.Labels", newJob.ObjectMeta.Labels))
+	log.Logger.Info("TROY", zap.Any("newJob Template.ObjectMeta.Labels", newJob.Spec.Template.ObjectMeta.Labels))
+
 	if _, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Update(ctx, newJob, metav1.UpdateOptions{TypeMeta: jobMetaData}); err != nil {
 		return errors.Wrap(err, "an error occurred trying to update the existing job")
 	}
