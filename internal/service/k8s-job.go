@@ -156,11 +156,12 @@ func (s *Scheduler) setupK8sJob(ctx context.Context, k8s *kubernetes.Clientset, 
 	log.Logger.Info("TROY", zap.Any("Template.ObjectMeta.Labels", existingJob.Spec.Template.ObjectMeta.Labels))
 
 	newJob.Spec.Selector = existingJob.Spec.Selector
-	newJob.ObjectMeta.Labels = existingJob.ObjectMeta.Labels
-	newJob.Spec.Template.ObjectMeta.Labels = existingJob.Spec.Template.ObjectMeta.Labels
+	//newJob.ObjectMeta.Labels = existingJob.ObjectMeta.Labels
+	//newJob.Spec.Template.ObjectMeta.Labels = existingJob.Spec.Template.ObjectMeta.Labels
 	if _, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Update(ctx, newJob, metav1.UpdateOptions{TypeMeta: jobMetaData}); err != nil {
 		return errors.Wrap(err, "an error occurred trying to update the existing job")
 	}
+	log.Logger.Info("TROY", zap.Any("success update", true))
 	return nil
 }
 
