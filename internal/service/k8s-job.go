@@ -187,7 +187,9 @@ func (s *Scheduler) watchJobPods(
 	}
 	started := make(map[string]bool)
 
+	log.Logger.Info("TROY newJob watch pods")
 	for event := range watch.ResultChan() {
+		log.Logger.Info("TROY newJob watch pods", zap.Any("event", event))
 		p, ok := event.Object.(*apiv1.Pod)
 		if !ok {
 			continue
@@ -207,10 +209,12 @@ func (s *Scheduler) watchJobPods(
 			started[p.Name] = true
 		}
 
+		log.Logger.Info("TROY started pods count", zap.Any("started", len(started)))
 		if len(started) >= 1 {
 			watch.Stop()
 		}
 	}
+	log.Logger.Info("TROY Done watching pods")
 	return nil
 }
 
