@@ -3,10 +3,9 @@ package service
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"gitlab.unanet.io/devops/eve/pkg/log"
-	"go.uber.org/zap"
+	"gitlab.unanet.io/devops/eve/pkg/retry"
 
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 
@@ -94,6 +93,12 @@ func (s *Scheduler) hydrateK8sJob(ctx context.Context, plan *eve.NSDeploymentPla
 	}, nil
 }
 
+type retryLogger struct{}
+
+func (r retryLogger) Printf(format string, v ...interface{}) {
+	log.Logger.Info(fmt.Sprintf(format, v...))
+}
+
 func (s *Scheduler) setupK8sJob(ctx context.Context, k8s *kubernetes.Clientset, plan *eve.NSDeploymentPlan, job *eve.DeployJob) error {
 
 	newJob, err := s.hydrateK8sJob(ctx, plan, job)
@@ -101,7 +106,7 @@ func (s *Scheduler) setupK8sJob(ctx context.Context, k8s *kubernetes.Clientset, 
 		return errors.Wrap(err, "failed to hydrate the k8s job")
 	}
 
-	_, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Get(ctx, job.JobName, metav1.GetOptions{})
+	existingJob, err := k8s.BatchV1().Jobs(plan.Namespace.Name).Get(ctx, job.JobName, metav1.GetOptions{})
 	if err != nil {
 		if k8sErrors.IsNotFound(err) {
 			// This job hasn't been deployed yet so we need to deploy it (create)
@@ -114,97 +119,40 @@ func (s *Scheduler) setupK8sJob(ctx context.Context, k8s *kubernetes.Clientset, 
 		return errors.Wrap(err, "an error occurred trying to check for the deployment")
 	}
 
-	// OK A Job already exists. Let's cleanup the existing pods, l
-	// let's watch the existing pods, to make sure they aren't still running (WIP)
-	// Let's watch the pods for results
-	//pods := k8s.CoreV1().Pods(plan.Namespace.Name)
-	//if pods != nil {
-	//
-	//}
-	//watch, err := pods.Watch(ctx, metav1.ListOptions{
-	//	TypeMeta:       metav1.TypeMeta{},
-	//	LabelSelector:  jobLabelSelector(job),
-	//	TimeoutSeconds: int64Ptr(config.GetConfig().K8sDeployTimeoutSec),
-	//})
-	//if err != nil {
-	//	return errors.Wrap(err, "an error occurred trying to watch the pods, deployment may have succeeded")
-	//}
+	dp := metav1.DeletePropagationForeground
 
-	existingPods, err := k8s.CoreV1().Pods(plan.Namespace.Name).List(ctx, metav1.ListOptions{
-		TypeMeta:      metav1.TypeMeta{},
-		LabelSelector: jobLabelSelector(job),
-	})
-	if err == nil && existingPods != nil && len(existingPods.Items) > 0 {
-		iterations := 0
-	loop:
-		iterations++
-		runningCount := 0
-		for _, x := range existingPods.Items {
-			log.Logger.Info("TROY", zap.Any("existing pod status", x.Status))
-			if x.Status.Phase == apiv1.PodRunning {
-				log.Logger.Info("TROY", zap.Any("runningCount", runningCount))
-				runningCount++
+	err = retry.Do(ctx, func() error {
+		k8Err := k8s.BatchV1().Jobs(plan.Namespace.Name).Delete(ctx, existingJob.Name, metav1.DeleteOptions{
+			TypeMeta:           jobMetaData,
+			GracePeriodSeconds: int64Ptr(0),
+			PropagationPolicy:  &dp,
+		})
+		if k8Err != nil {
+			if k8sErrors.IsNotFound(err) {
+				return nil
 			}
-			//_ = k8s.CoreV1().Pods(plan.Namespace.Name).Delete(ctx, x.Name, metav1.DeleteOptions{})
+			return errors.Wrap(k8Err, "failed to delete k8s job")
 		}
-		time.Sleep(2 * time.Second)
-		if iterations < 30 && runningCount > 0 {
-			goto loop
-		}
+		return nil
+	}, retry.WithLogger(retryLogger{}))
+	if err != nil {
+		return errors.Wrap(err, "failed to delete k8s job with retrier")
 	}
-	log.Logger.Info("TROY NO Existing pod")
 
-	//// TODO: We need to wrap this in a common retry/backoff pattern
-	//for i := 1; i < 60; i++ {
-	//	time.Sleep(1 * time.Second)
-	//	existingPods, err := k8s.CoreV1().Pods(plan.Namespace.Name).List(ctx, metav1.ListOptions{
-	//		TypeMeta:      metav1.TypeMeta{},
-	//		LabelSelector: jobLabelSelector(job),
-	//	})
-	//	if err != nil {
-	//		return errors.Wrap(err, "an error occurred trying to wait for old migration jobs to be removed")
-	//	}
-	//	// All existing pods are gone...let's break
-	//	if len(existingPods.Items) == 0 {
-	//		break
-	//	}
-	//
-	//	if i == 59 {
-	//		return errors.Wrap(err, "waited 60 seconds for job pods to be removed but some still exist")
-	//	}
-	//}
-	//
-	//var dp = metav1.DeletePropagationOrphan
-	//
-	//k8s.BatchV1().Jobs(plan.Namespace.Name).Delete(ctx, existingJob.Name, metav1.DeleteOptions{
-	//	TypeMeta:           jobMetaData,
-	//	GracePeriodSeconds: nil,
-	//	Preconditions:      nil,
-	//	OrphanDependents:   nil,
-	//	PropagationPolicy:  &dp,
-	//	DryRun:             nil,
-	//})
+	err = retry.Do(ctx, func() error {
+		_, k8Err := k8s.BatchV1().Jobs(plan.Namespace.Name).Create(ctx, newJob, metav1.CreateOptions{})
+		if k8Err != nil {
+			if k8sErrors.IsNotFound(err) {
+				return nil
+			}
+			return errors.Wrap(k8Err, "failed to create the k8s job")
+		}
+		return nil
+	}, retry.WithLogger(retryLogger{}))
+	if err != nil {
+		return errors.Wrap(err, "failed to create k8s job with retrier")
+	}
 
-	//log.Logger.Info("TROY", zap.Any("existingJob selector", existingJob.Spec.Selector))
-	//log.Logger.Info("TROY", zap.Any("existingJob ObjectMeta.Labels", existingJob.ObjectMeta.Labels))
-	//log.Logger.Info("TROY", zap.Any("existingJob Template.ObjectMeta.Labels", existingJob.Spec.Template.ObjectMeta.Labels))
-	//
-	//newJob.Spec.Selector = existingJob.Spec.Selector
-	////newJob.ObjectMeta.Labels = existingJob.ObjectMeta.Labels
-	////newJob.Spec.Template.ObjectMeta.Labels = existingJob.Spec.Template.ObjectMeta.Labels
-	//
-	//newJob.Spec.Template.ObjectMeta.Labels = make(map[string]string)
-	//newJob.Spec.Template.ObjectMeta.Labels["controller-uid"] = existingJob.Spec.Template.ObjectMeta.Labels["controller-uid"]
-	//newJob.Spec.Template.ObjectMeta.Labels["job-name"] = existingJob.Spec.Template.ObjectMeta.Labels["job-name"]
-	//
-	//log.Logger.Info("TROY", zap.Any("newJob selector", newJob.Spec.Selector))
-	//log.Logger.Info("TROY", zap.Any("newJob ObjectMeta.Labels", newJob.ObjectMeta.Labels))
-	//log.Logger.Info("TROY", zap.Any("newJob Template.ObjectMeta.Labels", newJob.Spec.Template.ObjectMeta.Labels))
-	//
-	//if _, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Update(ctx, newJob, metav1.UpdateOptions{TypeMeta: jobMetaData}); err != nil {
-	//	return errors.Wrap(err, "an error occurred trying to update the existing job")
-	//}
-	//log.Logger.Info("TROY", zap.Any("success update", true))
 	return nil
 }
 

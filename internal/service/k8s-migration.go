@@ -138,10 +138,7 @@ func getK8sMigrationJob(
 			BackoffLimit: int32Ptr(0),
 			Template: apiv1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"job":     jobName,
-						"version": artifactVersion,
-					},
+					Labels: map[string]string{"job": jobName, "version": artifactVersion},
 				},
 				Spec: apiv1.PodSpec{
 					RestartPolicy: apiv1.RestartPolicyNever,
