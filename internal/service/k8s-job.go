@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"gitlab.unanet.io/devops/eve/pkg/log"
 	"go.uber.org/zap"
@@ -134,12 +135,21 @@ func (s *Scheduler) setupK8sJob(ctx context.Context, k8s *kubernetes.Clientset, 
 		LabelSelector: jobLabelSelector(job),
 	})
 	if err == nil && existingPods != nil && len(existingPods.Items) > 0 {
+		iterations := 0
+	loop:
+		iterations++
+		runningCount := 0
 		for _, x := range existingPods.Items {
 			log.Logger.Info("TROY", zap.Any("existing pod status", x.Status))
-			for _, v := range x.Status.ContainerStatuses {
-				log.Logger.Info("TROY", zap.Any("existing pod CONTAINER status", v))
+			if x.Status.Phase == apiv1.PodRunning {
+				log.Logger.Info("TROY", zap.Any("runningCount", runningCount))
+				runningCount++
 			}
-			_ = k8s.CoreV1().Pods(plan.Namespace.Name).Delete(ctx, x.Name, metav1.DeleteOptions{})
+			//_ = k8s.CoreV1().Pods(plan.Namespace.Name).Delete(ctx, x.Name, metav1.DeleteOptions{})
+		}
+		time.Sleep(2 * time.Second)
+		if iterations < 30 && runningCount > 0 {
+			goto loop
 		}
 	}
 	log.Logger.Info("TROY NO Existing pod")
