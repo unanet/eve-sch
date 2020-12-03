@@ -10,8 +10,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"gitlab.unanet.io/devops/eve/pkg/log"
-	"go.uber.org/zap"
 	apiv1 "k8s.io/api/core/v1"
 
 	"github.com/stretchr/testify/require"
@@ -57,7 +55,6 @@ func TestScheduler_deployNamespace(t *testing.T) {
 }
 
 func TestThis(t *testing.T) {
-	log.Logger.Info("TROY")
 	k8s := GetK8sClient(t)
 	ctx := context.TODO()
 	pods := k8s.CoreV1().Pods("una-dev-current")
@@ -71,15 +68,12 @@ func TestThis(t *testing.T) {
 
 	started := make(map[string]bool)
 
-	log.Logger.Info("TROY Event", zap.Any("container status", ""))
 	for event := range watch.ResultChan() {
 		p, ok := event.Object.(*apiv1.Pod)
 		if !ok {
 			continue
 		}
-		log.Logger.Info("TROY POD Event", zap.Any("container status", p))
 		for _, x := range p.Status.ContainerStatuses {
-			log.Logger.Info("TROY Container Status", zap.Any("container status", x))
 			if x.LastTerminationState.Terminated != nil {
 				watch.Stop()
 			}
