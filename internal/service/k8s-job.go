@@ -154,6 +154,10 @@ func (s *Scheduler) setupK8sJob(ctx context.Context, k8s *kubernetes.Clientset, 
 	//newJob.ObjectMeta.Labels = existingJob.ObjectMeta.Labels
 	//newJob.Spec.Template.ObjectMeta.Labels = existingJob.Spec.Template.ObjectMeta.Labels
 
+	newJob.Spec.Template.ObjectMeta.Labels = make(map[string]string)
+	newJob.Spec.Template.ObjectMeta.Labels["controller-uid"] = existingJob.Spec.Template.ObjectMeta.Labels["controller-uid"]
+	newJob.Spec.Template.ObjectMeta.Labels["job-name"] = existingJob.Spec.Template.ObjectMeta.Labels["job-name"]
+
 	log.Logger.Info("TROY", zap.Any("newJob selector", newJob.Spec.Selector))
 	log.Logger.Info("TROY", zap.Any("newJob ObjectMeta.Labels", newJob.ObjectMeta.Labels))
 	log.Logger.Info("TROY", zap.Any("newJob Template.ObjectMeta.Labels", newJob.Spec.Template.ObjectMeta.Labels))
