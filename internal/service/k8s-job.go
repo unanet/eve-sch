@@ -142,6 +142,7 @@ func (s *Scheduler) setupK8sJob(ctx context.Context, k8s *kubernetes.Clientset, 
 			_ = k8s.CoreV1().Pods(plan.Namespace.Name).Delete(ctx, x.Name, metav1.DeleteOptions{})
 		}
 	}
+	log.Logger.Info("TROY NO Existing pod")
 
 	//// TODO: We need to wrap this in a common retry/backoff pattern
 	//for i := 1; i < 60; i++ {
