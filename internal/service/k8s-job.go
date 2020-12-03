@@ -53,9 +53,9 @@ func jobLabelSelector(job *eve.DeployJob) string {
 
 func jobMatchLabels(job *eve.DeployJob) map[string]string {
 	return map[string]string{
-		"job":      job.JobName,
-		"job-name": job.JobName,
-		"version":  job.AvailableVersion,
+		"job": job.JobName,
+		//"job-name": job.JobName,
+		"version": job.AvailableVersion,
 	}
 }
 
@@ -65,15 +65,9 @@ func (s *Scheduler) hydrateK8sJob(ctx context.Context, plan *eve.NSDeploymentPla
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      job.JobName,
 			Namespace: plan.Namespace.Name,
-			//Labels:    jobMatchLabels(job),
 		},
 		Spec: batchv1.JobSpec{
 			BackoffLimit: int32Ptr(0),
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					"job": job.JobName,
-				},
-			},
 			Template: apiv1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: jobMatchLabels(job),
@@ -186,36 +180,57 @@ func (s *Scheduler) watchJobPods(
 	if err != nil {
 		return errors.Wrap(err, "an error occurred trying to watch the pods, deployment may have succeeded")
 	}
-	started := make(map[string]bool)
 
-	log.Logger.Info("TROY newJob watch pods")
+	//started := make(map[string]bool)
+
+	//log.Logger.Info("TROY newJob watch pods")
+	//for event := range watch.ResultChan() {
+	//	log.Logger.Info("TROY newJob watch pods", zap.Any("event", event))
+	//	p, ok := event.Object.(*apiv1.Pod)
+	//	if !ok {
+	//		continue
+	//	}
+	//	log.Logger.Info("TROY POD Event", zap.Any("container status", p))
+	//	for _, x := range p.Status.ContainerStatuses {
+	//		log.Logger.Info("TROY Container Status", zap.Any("container status", x))
+	//		if x.LastTerminationState.Terminated != nil {
+	//			job.ExitCode = int(x.LastTerminationState.Terminated.ExitCode)
+	//			watch.Stop()
+	//			return nil
+	//		}
+	//
+	//		if !x.Ready {
+	//			continue
+	//		}
+	//		started[p.Name] = true
+	//	}
+	//
+	//	log.Logger.Info("TROY started pods count", zap.Any("started", len(started)))
+	//	if len(started) >= 1 {
+	//		watch.Stop()
+	//	}
+	//}
+	//log.Logger.Info("TROY Done watching pods")
+	//return nil
+
 	for event := range watch.ResultChan() {
-		log.Logger.Info("TROY newJob watch pods", zap.Any("event", event))
 		p, ok := event.Object.(*apiv1.Pod)
 		if !ok {
 			continue
 		}
-		log.Logger.Info("TROY POD Event", zap.Any("container status", p))
 		for _, x := range p.Status.ContainerStatuses {
-			log.Logger.Info("TROY Container Status", zap.Any("container status", x))
-			if x.LastTerminationState.Terminated != nil {
-				job.ExitCode = int(x.LastTerminationState.Terminated.ExitCode)
-				watch.Stop()
-				return nil
-			}
-
-			if !x.Ready {
+			if x.State.Terminated == nil {
 				continue
 			}
-			started[p.Name] = true
-		}
-
-		log.Logger.Info("TROY started pods count", zap.Any("started", len(started)))
-		if len(started) >= 1 {
 			watch.Stop()
+
+			if x.State.Terminated.ExitCode != 0 {
+				job.Result = eve.DeployArtifactResultFailed
+				plan.Message("job failed, exit code: %d, job: %s", x.State.Terminated.ExitCode, job.JobName)
+				return fmt.Errorf("job failed with exit code: %v", x.State.Terminated.ExitCode)
+			}
 		}
 	}
-	log.Logger.Info("TROY Done watching pods")
 	return nil
 }
 
