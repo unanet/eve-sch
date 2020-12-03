@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"go.uber.org/zap"
+
 	"gitlab.unanet.io/devops/eve/pkg/log"
 	"gitlab.unanet.io/devops/eve/pkg/retry"
 
@@ -175,57 +177,56 @@ func (s *Scheduler) watchJobPods(
 		return errors.Wrap(err, "an error occurred trying to watch the pods, deployment may have succeeded")
 	}
 
-	//started := make(map[string]bool)
+	started := make(map[string]bool)
 
-	//log.Logger.Info("TROY newJob watch pods")
-	//for event := range watch.ResultChan() {
-	//	log.Logger.Info("TROY newJob watch pods", zap.Any("event", event))
-	//	p, ok := event.Object.(*apiv1.Pod)
-	//	if !ok {
-	//		continue
-	//	}
-	//	log.Logger.Info("TROY POD Event", zap.Any("container status", p))
-	//	for _, x := range p.Status.ContainerStatuses {
-	//		log.Logger.Info("TROY Container Status", zap.Any("container status", x))
-	//		if x.LastTerminationState.Terminated != nil {
-	//			job.ExitCode = int(x.LastTerminationState.Terminated.ExitCode)
-	//			watch.Stop()
-	//			return nil
-	//		}
-	//
-	//		if !x.Ready {
-	//			continue
-	//		}
-	//		started[p.Name] = true
-	//	}
-	//
-	//	log.Logger.Info("TROY started pods count", zap.Any("started", len(started)))
-	//	if len(started) >= 1 {
-	//		watch.Stop()
-	//	}
-	//}
-	//log.Logger.Info("TROY Done watching pods")
-	//return nil
-
+	log.Logger.Info("TROY newJob watch pods")
 	for event := range watch.ResultChan() {
+		log.Logger.Info("TROY newJob watch pods", zap.Any("event", event))
 		p, ok := event.Object.(*apiv1.Pod)
 		if !ok {
 			continue
 		}
+		log.Logger.Info("TROY POD Event", zap.Any("container status", p))
 		for _, x := range p.Status.ContainerStatuses {
-			if x.State.Terminated == nil {
+			log.Logger.Info("TROY Container Status", zap.Any("container status", x))
+			if x.LastTerminationState.Terminated != nil {
+				job.ExitCode = int(x.LastTerminationState.Terminated.ExitCode)
+				watch.Stop()
+				return nil
+			}
+
+			if !x.Ready {
 				continue
 			}
-			watch.Stop()
+			started[p.Name] = true
+		}
 
-			if x.State.Terminated.ExitCode != 0 {
-				job.Result = eve.DeployArtifactResultFailed
-				plan.Message("job failed, exit code: %d, job: %s", x.State.Terminated.ExitCode, job.JobName)
-				return fmt.Errorf("job failed with exit code: %v", x.State.Terminated.ExitCode)
-			}
+		log.Logger.Info("TROY started pods count", zap.Any("started", len(started)))
+		if len(started) >= 1 {
+			watch.Stop()
 		}
 	}
+	log.Logger.Info("TROY Done watching pods")
 	return nil
+
+	//for event := range watch.ResultChan() {
+	//	p, ok := event.Object.(*apiv1.Pod)
+	//	if !ok {
+	//		continue
+	//	}
+	//	for _, x := range p.Status.ContainerStatuses {
+	//		if x.State.Terminated == nil {
+	//			continue
+	//		}
+	//		watch.Stop()
+	//
+	//		if x.State.Terminated.ExitCode != 0 {
+	//			job.Result = eve.DeployArtifactResultFailed
+	//			plan.Message("job failed, exit code: %d, job: %s", x.State.Terminated.ExitCode, job.JobName)
+	//			return fmt.Errorf("job failed with exit code: %v", x.State.Terminated.ExitCode)
+	//		}
+	//	}
+	//}
 }
 
 func (s *Scheduler) runDockerJob(ctx context.Context, job *eve.DeployJob, plan *eve.NSDeploymentPlan) {
