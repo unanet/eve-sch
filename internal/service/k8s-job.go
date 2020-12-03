@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"gitlab.unanet.io/devops/eve/pkg/log"
 	"go.uber.org/zap"
@@ -53,8 +52,7 @@ func jobLabelSelector(job *eve.DeployJob) string {
 
 func jobMatchLabels(job *eve.DeployJob) map[string]string {
 	return map[string]string{
-		"job": job.JobName,
-		//"job-name": job.JobName,
+		"job":     job.JobName,
 		"version": job.AvailableVersion,
 	}
 }
@@ -102,7 +100,7 @@ func (s *Scheduler) setupK8sJob(ctx context.Context, k8s *kubernetes.Clientset, 
 		return errors.Wrap(err, "failed to hydrate the k8s job")
 	}
 
-	existingJob, err := k8s.BatchV1().Jobs(plan.Namespace.Name).Get(ctx, job.JobName, metav1.GetOptions{})
+	_, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Get(ctx, job.JobName, metav1.GetOptions{})
 	if err != nil {
 		if k8sErrors.IsNotFound(err) {
 			// This job hasn't been deployed yet so we need to deploy it (create)
@@ -111,61 +109,91 @@ func (s *Scheduler) setupK8sJob(ctx context.Context, k8s *kubernetes.Clientset, 
 			}
 			return nil
 		}
-		// an error occurred trying to see if the app is already deployed
+		// an error occurred trying to see if the job is already deployed
 		return errors.Wrap(err, "an error occurred trying to check for the deployment")
 	}
 
-	// OK A Job already exists. Let's cleanup the existing pods
+	// OK A Job already exists. Let's cleanup the existing pods, l
+	// let's watch the existing pods, to make sure they aren't still running (WIP)
+	// Let's watch the pods for results
+	//pods := k8s.CoreV1().Pods(plan.Namespace.Name)
+	//if pods != nil {
+	//
+	//}
+	//watch, err := pods.Watch(ctx, metav1.ListOptions{
+	//	TypeMeta:       metav1.TypeMeta{},
+	//	LabelSelector:  jobLabelSelector(job),
+	//	TimeoutSeconds: int64Ptr(config.GetConfig().K8sDeployTimeoutSec),
+	//})
+	//if err != nil {
+	//	return errors.Wrap(err, "an error occurred trying to watch the pods, deployment may have succeeded")
+	//}
+
 	existingPods, err := k8s.CoreV1().Pods(plan.Namespace.Name).List(ctx, metav1.ListOptions{
 		TypeMeta:      metav1.TypeMeta{},
 		LabelSelector: jobLabelSelector(job),
 	})
 	if err == nil && existingPods != nil && len(existingPods.Items) > 0 {
 		for _, x := range existingPods.Items {
+			log.Logger.Info("TROY", zap.Any("existing pod status", x.Status))
+			for _, v := range x.Status.ContainerStatuses {
+				log.Logger.Info("TROY", zap.Any("existing pod CONTAINER status", v))
+			}
 			_ = k8s.CoreV1().Pods(plan.Namespace.Name).Delete(ctx, x.Name, metav1.DeleteOptions{})
 		}
 	}
 
-	// TODO: We need to wrap this in a common retry/backoff pattern
-	for i := 1; i < 60; i++ {
-		time.Sleep(1 * time.Second)
-		existingPods, err := k8s.CoreV1().Pods(plan.Namespace.Name).List(ctx, metav1.ListOptions{
-			TypeMeta:      metav1.TypeMeta{},
-			LabelSelector: jobLabelSelector(job),
-		})
-		if err != nil {
-			return errors.Wrap(err, "an error occurred trying to wait for old migration jobs to be removed")
-		}
-		// All existing pods are gone...let's break
-		if len(existingPods.Items) == 0 {
-			break
-		}
+	//// TODO: We need to wrap this in a common retry/backoff pattern
+	//for i := 1; i < 60; i++ {
+	//	time.Sleep(1 * time.Second)
+	//	existingPods, err := k8s.CoreV1().Pods(plan.Namespace.Name).List(ctx, metav1.ListOptions{
+	//		TypeMeta:      metav1.TypeMeta{},
+	//		LabelSelector: jobLabelSelector(job),
+	//	})
+	//	if err != nil {
+	//		return errors.Wrap(err, "an error occurred trying to wait for old migration jobs to be removed")
+	//	}
+	//	// All existing pods are gone...let's break
+	//	if len(existingPods.Items) == 0 {
+	//		break
+	//	}
+	//
+	//	if i == 59 {
+	//		return errors.Wrap(err, "waited 60 seconds for job pods to be removed but some still exist")
+	//	}
+	//}
+	//
+	//var dp = metav1.DeletePropagationOrphan
+	//
+	//k8s.BatchV1().Jobs(plan.Namespace.Name).Delete(ctx, existingJob.Name, metav1.DeleteOptions{
+	//	TypeMeta:           jobMetaData,
+	//	GracePeriodSeconds: nil,
+	//	Preconditions:      nil,
+	//	OrphanDependents:   nil,
+	//	PropagationPolicy:  &dp,
+	//	DryRun:             nil,
+	//})
 
-		if i == 59 {
-			return errors.Wrap(err, "waited 60 seconds for job pods to be removed but some still exist")
-		}
-	}
-
-	log.Logger.Info("TROY", zap.Any("existingJob selector", existingJob.Spec.Selector))
-	log.Logger.Info("TROY", zap.Any("existingJob ObjectMeta.Labels", existingJob.ObjectMeta.Labels))
-	log.Logger.Info("TROY", zap.Any("existingJob Template.ObjectMeta.Labels", existingJob.Spec.Template.ObjectMeta.Labels))
-
-	newJob.Spec.Selector = existingJob.Spec.Selector
-	//newJob.ObjectMeta.Labels = existingJob.ObjectMeta.Labels
-	//newJob.Spec.Template.ObjectMeta.Labels = existingJob.Spec.Template.ObjectMeta.Labels
-
-	newJob.Spec.Template.ObjectMeta.Labels = make(map[string]string)
-	newJob.Spec.Template.ObjectMeta.Labels["controller-uid"] = existingJob.Spec.Template.ObjectMeta.Labels["controller-uid"]
-	newJob.Spec.Template.ObjectMeta.Labels["job-name"] = existingJob.Spec.Template.ObjectMeta.Labels["job-name"]
-
-	log.Logger.Info("TROY", zap.Any("newJob selector", newJob.Spec.Selector))
-	log.Logger.Info("TROY", zap.Any("newJob ObjectMeta.Labels", newJob.ObjectMeta.Labels))
-	log.Logger.Info("TROY", zap.Any("newJob Template.ObjectMeta.Labels", newJob.Spec.Template.ObjectMeta.Labels))
-
-	if _, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Update(ctx, newJob, metav1.UpdateOptions{TypeMeta: jobMetaData}); err != nil {
-		return errors.Wrap(err, "an error occurred trying to update the existing job")
-	}
-	log.Logger.Info("TROY", zap.Any("success update", true))
+	//log.Logger.Info("TROY", zap.Any("existingJob selector", existingJob.Spec.Selector))
+	//log.Logger.Info("TROY", zap.Any("existingJob ObjectMeta.Labels", existingJob.ObjectMeta.Labels))
+	//log.Logger.Info("TROY", zap.Any("existingJob Template.ObjectMeta.Labels", existingJob.Spec.Template.ObjectMeta.Labels))
+	//
+	//newJob.Spec.Selector = existingJob.Spec.Selector
+	////newJob.ObjectMeta.Labels = existingJob.ObjectMeta.Labels
+	////newJob.Spec.Template.ObjectMeta.Labels = existingJob.Spec.Template.ObjectMeta.Labels
+	//
+	//newJob.Spec.Template.ObjectMeta.Labels = make(map[string]string)
+	//newJob.Spec.Template.ObjectMeta.Labels["controller-uid"] = existingJob.Spec.Template.ObjectMeta.Labels["controller-uid"]
+	//newJob.Spec.Template.ObjectMeta.Labels["job-name"] = existingJob.Spec.Template.ObjectMeta.Labels["job-name"]
+	//
+	//log.Logger.Info("TROY", zap.Any("newJob selector", newJob.Spec.Selector))
+	//log.Logger.Info("TROY", zap.Any("newJob ObjectMeta.Labels", newJob.ObjectMeta.Labels))
+	//log.Logger.Info("TROY", zap.Any("newJob Template.ObjectMeta.Labels", newJob.Spec.Template.ObjectMeta.Labels))
+	//
+	//if _, err = k8s.BatchV1().Jobs(plan.Namespace.Name).Update(ctx, newJob, metav1.UpdateOptions{TypeMeta: jobMetaData}); err != nil {
+	//	return errors.Wrap(err, "an error occurred trying to update the existing job")
+	//}
+	//log.Logger.Info("TROY", zap.Any("success update", true))
 	return nil
 }
 
@@ -176,6 +204,9 @@ func (s *Scheduler) watchJobPods(
 	job *eve.DeployJob,
 ) error {
 	pods := k8s.CoreV1().Pods(plan.Namespace.Name)
+	if pods == nil {
+		return nil
+	}
 	watch, err := pods.Watch(ctx, metav1.ListOptions{
 		TypeMeta:       metav1.TypeMeta{},
 		LabelSelector:  jobLabelSelector(job),
