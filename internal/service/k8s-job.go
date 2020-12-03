@@ -142,7 +142,7 @@ func (s *Scheduler) setupK8sJob(ctx context.Context, k8s *kubernetes.Clientset, 
 	err = retry.Do(ctx, func() error {
 		_, k8Err := k8s.BatchV1().Jobs(plan.Namespace.Name).Create(ctx, newJob, metav1.CreateOptions{})
 		if k8Err != nil {
-			if k8sErrors.IsNotFound(err) {
+			if k8sErrors.IsAlreadyExists(err) || k8sErrors.IsConflict(err) {
 				return nil
 			}
 			return errors.Wrap(k8Err, "failed to create the k8s job")
