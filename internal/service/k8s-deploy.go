@@ -314,6 +314,7 @@ func (s *Scheduler) watchServicePods(
 
 		if len(started) >= 1 {
 			watch.Stop()
+			return nil
 		}
 	}
 	service.ExitCode = TimeoutExitCode
