@@ -21,6 +21,7 @@ import (
 // Public CONST
 const (
 	DockerRepoFormat = "unanet-%s.jfrog.io"
+	TimeoutExitCode  = -999999
 )
 
 // Private CONST
@@ -315,6 +316,7 @@ func (s *Scheduler) watchServicePods(
 			watch.Stop()
 		}
 	}
+	service.ExitCode = TimeoutExitCode
 	return nil
 }
 
@@ -350,7 +352,11 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 	}
 
 	if service.ExitCode != 0 {
-		logFn("pod failed to start and returned a non zero exit code: %d", service.ExitCode)
+		if service.ExitCode == TimeoutExitCode {
+			logFn("timeout exceeded while waiting for the pod to start.")
+		} else {
+			logFn("pod failed to start and returned a non zero exit code: %d", service.ExitCode)
+		}
 		validExitCodes, err := expandSuccessExitCodes(service.SuccessExitCodes)
 		if err != nil {
 			failNLog(err, "an error occurred parsing valid exit codes for the service")
