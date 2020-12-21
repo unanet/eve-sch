@@ -3,9 +3,9 @@ package service
 import (
 	"context"
 
-	"gitlab.unanet.io/devops/eve/pkg/errors"
 	"gitlab.unanet.io/devops/eve/pkg/eve"
 	"gitlab.unanet.io/devops/eve/pkg/queue"
+	"gitlab.unanet.io/devops/go/pkg/errors"
 )
 
 const (

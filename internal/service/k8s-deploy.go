@@ -60,15 +60,27 @@ func containerEnvVars(metadata map[string]interface{}) []apiv1.EnvVar {
 	return containerEnvVars
 }
 
-func deployAnnotations(port int) map[string]string {
-	if port == 0 {
-		return nil
+func serviceAnnotations(service *eve.DeployService) map[string]string {
+	result := make(map[string]string)
+
+	for k, v := range service.Annotations {
+		if vv, ok := v.(string); ok {
+			result[k] = vv
+		}
 	}
 
-	return map[string]string{
-		"prometheus.io/scrape": "true",
-		"prometheus.io/port":   strconv.Itoa(port),
+	return result
+}
+
+func deploymentAnnotations(service *eve.DeployService) map[string]string {
+	result := make(map[string]string)
+
+	if service.MetricsPort != 0 {
+		result["prometheus.io/scrape"] = "true"
+		result["prometheus.io/port"] = strconv.Itoa(service.MetricsPort)
 	}
+
+	return result
 }
 
 // { "limit": { "cpu": "1000m", "memory": "3000Mi" }, "request": { "cpu": "250m", "memory": "2000Mi" } }
@@ -157,12 +169,24 @@ func deploymentLabelSelector(service *eve.DeployService, timeNuance string) stri
 	return fmt.Sprintf("app=%s,version=%s,nuance=%s", service.ServiceName, service.AvailableVersion, timeNuance)
 }
 
-func deploymentMatchLabels(service *eve.DeployService, timeNuance string) map[string]string {
+func deploymentLabels(service *eve.DeployService, timeNuance string) map[string]string {
 	return map[string]string{
 		"app":     service.ServiceName,
 		"version": service.AvailableVersion,
 		"nuance":  timeNuance,
 	}
+}
+
+func serviceLabels(service *eve.DeployService) map[string]string {
+	base := make(map[string]string)
+
+	for k, v := range service.Labels {
+		if vv, ok := v.(string); ok {
+			base[k] = vv
+		}
+	}
+
+	return base
 }
 
 func (s *Scheduler) hydrateK8sDeployment(ctx context.Context, plan *eve.NSDeploymentPlan, service *eve.DeployService, nuance string) (*appsv1.Deployment, error) {
@@ -182,8 +206,8 @@ func (s *Scheduler) hydrateK8sDeployment(ctx context.Context, plan *eve.NSDeploy
 			},
 			Template: apiv1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels:      deploymentMatchLabels(service, nuance),
-					Annotations: deployAnnotations(service.MetricsPort),
+					Labels:      deploymentLabels(service, nuance),
+					Annotations: deploymentAnnotations(service),
 				},
 				Spec: apiv1.PodSpec{
 					SecurityContext: &apiv1.PodSecurityContext{

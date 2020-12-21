@@ -6,7 +6,7 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 	"gitlab.unanet.io/devops/eve-sch/internal/vault"
-	"gitlab.unanet.io/devops/eve/pkg/log"
+	"gitlab.unanet.io/devops/go/pkg/log"
 	"go.uber.org/zap"
 )
 
