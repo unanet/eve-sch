@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"gitlab.unanet.io/devops/eve/pkg/log"
-	"gitlab.unanet.io/devops/eve/pkg/retry"
+	"gitlab.unanet.io/devops/go/pkg/log"
+	"gitlab.unanet.io/devops/go/pkg/retry"
 
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 
@@ -50,11 +50,31 @@ func jobLabelSelector(job *eve.DeployJob) string {
 	return fmt.Sprintf("job=%s", job.JobName)
 }
 
-func jobMatchLabels(job *eve.DeployJob) map[string]string {
-	return map[string]string{
-		"job":     job.JobName,
-		"version": job.AvailableVersion,
+func deployJobAnnotations(job *eve.DeployJob) map[string]string {
+	result := make(map[string]string)
+
+	for k, v := range job.Annotations {
+		if vv, ok := v.(string); ok {
+			result[k] = vv
+		}
 	}
+
+	return result
+}
+
+func deployJobLabels(job *eve.DeployJob) map[string]string {
+	result := make(map[string]string)
+
+	for k, v := range job.Labels {
+		if vv, ok := v.(string); ok {
+			result[k] = vv
+		}
+	}
+
+	result["job"] = job.JobName
+	result["version"] = job.AvailableVersion
+
+	return result
 }
 
 func (s *Scheduler) hydrateK8sJob(ctx context.Context, plan *eve.NSDeploymentPlan, job *eve.DeployJob) (*batchv1.Job, error) {
@@ -68,7 +88,8 @@ func (s *Scheduler) hydrateK8sJob(ctx context.Context, plan *eve.NSDeploymentPla
 			BackoffLimit: int32Ptr(0),
 			Template: apiv1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: jobMatchLabels(job),
+					Labels:      deployJobLabels(job),
+					Annotations: deployJobAnnotations(job),
 				},
 				Spec: apiv1.PodSpec{
 					RestartPolicy: apiv1.RestartPolicyNever,

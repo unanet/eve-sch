@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
-	"gitlab.unanet.io/devops/eve/pkg/errors"
-	ehttp "gitlab.unanet.io/devops/eve/pkg/http"
-	"gitlab.unanet.io/devops/eve/pkg/log"
+	"gitlab.unanet.io/devops/go/pkg/errors"
+	ehttp "gitlab.unanet.io/devops/go/pkg/http"
+	"gitlab.unanet.io/devops/go/pkg/log"
 	"go.uber.org/zap"
 )
 

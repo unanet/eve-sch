@@ -5,9 +5,9 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
-	"gitlab.unanet.io/devops/eve/pkg/log"
 	"gitlab.unanet.io/devops/eve/pkg/queue"
 	"gitlab.unanet.io/devops/eve/pkg/s3"
+	"gitlab.unanet.io/devops/go/pkg/log"
 	"go.uber.org/zap"
 
 	"gitlab.unanet.io/devops/eve-sch/internal/config"

@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/dghubble/sling"
-	"gitlab.unanet.io/devops/eve/pkg/errors"
-	ehttp "gitlab.unanet.io/devops/eve/pkg/http"
-	"gitlab.unanet.io/devops/eve/pkg/json"
+	"gitlab.unanet.io/devops/go/pkg/errors"
+	ehttp "gitlab.unanet.io/devops/go/pkg/http"
+	"gitlab.unanet.io/devops/go/pkg/json"
 )
 
 const (

@@ -1,22 +1,22 @@
 module gitlab.unanet.io/devops/eve-sch
 
-go 1.14
+go 1.15
 
-// replace gitlab.unanet.io/devops/eve => /Users/centzi/code/devops/eve
+// replace gitlab.unanet.io/devops/eve => ../eve
 
 require (
-	github.com/aws/aws-sdk-go v1.25.41
+	github.com/aws/aws-sdk-go v1.36.9
 	github.com/dghubble/sling v1.3.0
 	github.com/docker/docker v1.13.2-0.20170601211448-f5ec1e2936dc
-	github.com/golang/protobuf v1.4.1 // indirect
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.4.0
-	gitlab.unanet.io/devops/eve v0.5.0
-	go.uber.org/zap v1.15.0
-	golang.org/x/crypto v0.0.0-20200429183012-4b2356b1ed79 // indirect
-	golang.org/x/net v0.0.0-20200506145744-7e3656a0809f // indirect
+	gitlab.unanet.io/devops/eve v0.5.1-0.20201217234615-52ce60bce87a
+	gitlab.unanet.io/devops/go v0.2.0
+	go.uber.org/multierr v1.6.0 // indirect
+	go.uber.org/zap v1.16.0
 	google.golang.org/appengine v1.6.6 // indirect
+	google.golang.org/protobuf v1.25.0 // indirect
 	k8s.io/api v0.18.2
 	k8s.io/apimachinery v0.18.2
 	k8s.io/client-go v0.18.2
