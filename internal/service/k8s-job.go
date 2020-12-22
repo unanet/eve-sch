@@ -47,7 +47,7 @@ func setupJobEnvironment(metadata map[string]interface{}, job *batchv1.Job) {
 }
 
 func jobLabelSelector(job *eve.DeployJob) string {
-	return fmt.Sprintf("job=%s", job.JobName)
+	return fmt.Sprintf("job=%s,version=%s", job.JobName, job.RequestedVersion)
 }
 
 func deployJobAnnotations(job *eve.DeployJob) map[string]string {
@@ -193,10 +193,8 @@ func (s *Scheduler) watchJobPods(
 		TimeoutSeconds: int64Ptr(config.GetConfig().K8sDeployTimeoutSec),
 	})
 	if err != nil {
-		return errors.Wrap(err, "an error occurred trying to watch the pods, deployment may have succeeded")
+		return errors.Wrap(err, "an error occurred trying to watch the pods, job may have succeeded")
 	}
-
-	started := make(map[string]bool)
 
 	for event := range watch.ResultChan() {
 		p, ok := event.Object.(*apiv1.Pod)
@@ -204,20 +202,13 @@ func (s *Scheduler) watchJobPods(
 			continue
 		}
 		for _, x := range p.Status.ContainerStatuses {
-			if x.LastTerminationState.Terminated != nil {
-				job.ExitCode = int(x.LastTerminationState.Terminated.ExitCode)
-				watch.Stop()
-				return nil
-			}
-
-			if !x.Ready {
+			if x.State.Terminated == nil {
 				continue
 			}
-			started[p.Name] = true
-		}
-
-		if len(started) >= 1 {
 			watch.Stop()
+			if x.State.Terminated.ExitCode != 0 {
+				job.ExitCode = int(x.LastTerminationState.Terminated.ExitCode)
+			}
 		}
 	}
 	return nil
