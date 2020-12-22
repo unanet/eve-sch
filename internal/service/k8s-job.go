@@ -209,6 +209,7 @@ func (s *Scheduler) watchJobPods(
 			if x.State.Terminated.ExitCode != 0 {
 				job.ExitCode = int(x.State.Terminated.ExitCode)
 			}
+			return nil
 		}
 	}
 	job.ExitCode = TimeoutExitCode
