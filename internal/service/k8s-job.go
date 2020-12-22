@@ -47,7 +47,7 @@ func setupJobEnvironment(metadata map[string]interface{}, job *batchv1.Job) {
 }
 
 func jobLabelSelector(job *eve.DeployJob) string {
-	return fmt.Sprintf("job=%s,version=%s", job.JobName, job.RequestedVersion)
+	return fmt.Sprintf("job=%s,version=%s", job.JobName, job.AvailableVersion)
 }
 
 func deployJobAnnotations(job *eve.DeployJob) map[string]string {
