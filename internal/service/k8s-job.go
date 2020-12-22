@@ -207,7 +207,7 @@ func (s *Scheduler) watchJobPods(
 			}
 			watch.Stop()
 			if x.State.Terminated.ExitCode != 0 {
-				job.ExitCode = int(x.LastTerminationState.Terminated.ExitCode)
+				job.ExitCode = int(x.State.Terminated.ExitCode)
 			}
 		}
 	}
