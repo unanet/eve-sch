@@ -47,7 +47,7 @@ func setupJobEnvironment(metadata map[string]interface{}, job *batchv1.Job) {
 }
 
 func jobLabelSelector(job *eve.DeployJob) string {
-	return fmt.Sprintf("job=%s,version=%s", job.JobName, job.AvailableVersion)
+	return fmt.Sprintf("job=%s", job.JobName)
 }
 
 func deployJobAnnotations(job *eve.DeployJob) map[string]string {
@@ -211,6 +211,7 @@ func (s *Scheduler) watchJobPods(
 			}
 		}
 	}
+	job.ExitCode = TimeoutExitCode
 	return nil
 }
 
@@ -236,7 +237,11 @@ func (s *Scheduler) runDockerJob(ctx context.Context, job *eve.DeployJob, plan *
 	}
 
 	if job.ExitCode != 0 {
-		logFn("pod failed to start and returned a non zero exit code: %d", job.ExitCode)
+		if job.ExitCode == TimeoutExitCode {
+			logFn("timeout of %d seconds exceeded while waiting for the pod to start", config.GetConfig().K8sDeployTimeoutSec)
+		} else {
+			logFn("pod failed to start and returned a non zero exit code: %d", job.ExitCode)
+		}
 		validExitCodes, err := expandSuccessExitCodes(job.SuccessExitCodes)
 		if err != nil {
 			fail(err, "an error occurred parsing valid exit codes for the service")
