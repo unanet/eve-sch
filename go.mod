@@ -12,7 +12,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.4.0
 	gitlab.unanet.io/devops/eve v0.6.0
-	gitlab.unanet.io/devops/go v0.2.0
+	gitlab.unanet.io/devops/go v0.4.0
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.16.0
 	google.golang.org/appengine v1.6.6 // indirect
