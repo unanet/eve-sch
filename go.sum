@@ -475,6 +475,8 @@ github.com/zenazn/goji v0.9.0/go.mod h1:7S9M489iMyHBNxwZnk9/EHS098H4/F6TATF2mIxt
 gitlab.com/nyarla/go-crypt v0.0.0-20160106005555-d9a5dc2b789b/go.mod h1:T3BPAOm2cqquPa0MKWeNkmOM5RQsRhkrwMWonFMN7fE=
 gitlab.unanet.io/devops/eve v0.6.0 h1:XSpLFvt/UNmc48BTaRHZp/LG6+1mYhtJifKWsJwVjmc=
 gitlab.unanet.io/devops/eve v0.6.0/go.mod h1:Y50DsuejUnAsRqWaOYoT+lUI2idzbGCMa9/oW8WA2rM=
+gitlab.unanet.io/devops/eve v0.6.1-0.20201228213304-11d24d8792cf h1:U/Z896Oog01OwZK1BAhXMN3LQADya1lDjeN4EjaVmGs=
+gitlab.unanet.io/devops/eve v0.6.1-0.20201228213304-11d24d8792cf/go.mod h1:Y50DsuejUnAsRqWaOYoT+lUI2idzbGCMa9/oW8WA2rM=
 gitlab.unanet.io/devops/go v0.2.0 h1:ESCYzEB9/w/kMfHJwpqyEX10KrEVqmVzrIkKbdyGnqU=
 gitlab.unanet.io/devops/go v0.2.0/go.mod h1:4mOA9RxmdSHnHCh7wZ4cSSJC756VmFA4AjNOLfNhtPk=
 gitlab.unanet.io/devops/go v0.4.0 h1:ojLdbd0JgRnLGbV2offaHkTuswBYNbFE0GaR+Fj00Vs=
