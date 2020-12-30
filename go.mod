@@ -11,7 +11,7 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.4.0
-	gitlab.unanet.io/devops/eve v0.6.1-0.20201230143802-7996ff47ad0f // indirect
+	gitlab.unanet.io/devops/eve v0.6.1-0.20201230144650-4765a4ea343f // indirect
 	gitlab.unanet.io/devops/go v0.6.0
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.16.0
