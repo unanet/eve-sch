@@ -10,6 +10,7 @@ import (
 	"gitlab.unanet.io/devops/go/pkg/log"
 	"go.uber.org/zap"
 
+	"gitlab.unanet.io/devops/eve-sch/internal/api"
 	"gitlab.unanet.io/devops/eve-sch/internal/config"
 	"gitlab.unanet.io/devops/eve-sch/internal/fn"
 	"gitlab.unanet.io/devops/eve-sch/internal/service"
@@ -46,5 +47,18 @@ func main() {
 	fnTrigger := fn.NewTrigger(1 * time.Hour)
 
 	worker := queue.NewWorker("eve-sch", schQueue, c.SchQWorkerTimeout)
-	service.NewScheduler(worker, s3Downloader, s3Uploader, c.ApiQUrl, vaultClient, fnTrigger).Start()
+	scheduler := service.NewScheduler(worker, s3Downloader, s3Uploader, c.ApiQUrl, vaultClient, fnTrigger)
+	scheduler.Start()
+
+	controllers, err := api.InitializeControllers()
+	if err != nil {
+		log.Logger.Panic("Unable to Initialize the Controllers")
+	}
+
+	apiServer, err := api.NewApi(controllers, c)
+	if err != nil {
+		log.Logger.Panic("Failed to Create Api App", zap.Error(err))
+	}
+
+	apiServer.Start(scheduler.Stop)
 }

@@ -3,24 +3,20 @@ package service
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
 	"strings"
 	"syscall"
-	"time"
 
 	"gitlab.unanet.io/devops/eve/pkg/eve"
 	"gitlab.unanet.io/devops/eve/pkg/queue"
 	"gitlab.unanet.io/devops/go/pkg/errors"
 	"gitlab.unanet.io/devops/go/pkg/log"
-	"gitlab.unanet.io/devops/go/pkg/metrics"
 	"go.uber.org/zap"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
-	"gitlab.unanet.io/devops/eve-sch/internal/config"
 	"gitlab.unanet.io/devops/eve-sch/internal/fn"
 	"gitlab.unanet.io/devops/eve-sch/internal/vault"
 )
@@ -47,7 +43,6 @@ type Scheduler struct {
 	downloader eve.CloudDownloader
 	uploader   eve.CloudUploader
 	sigChannel chan os.Signal
-	mServer    *http.Server
 	done       chan bool
 	apiQUrl    string
 	vault      SecretsClient
@@ -72,42 +67,17 @@ func (s *Scheduler) Logger(ctx context.Context) *zap.Logger {
 }
 
 func (s *Scheduler) Start() {
-	s.mServer = metrics.StartMetricsServer(config.GetConfig().MetricsPort)
+	go s.start()
+}
 
+func (s *Scheduler) start() {
 	signal.Notify(s.sigChannel, os.Interrupt, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
-	go s.sigHandler()
 	s.worker.Start(queue.HandlerFunc(s.handleMessage))
 	<-s.done
 	log.Logger.Info("Service Shutdown")
 }
 
-func (s *Scheduler) sigHandler() {
-	for {
-		sig := <-s.sigChannel
-		switch sig {
-		case syscall.SIGHUP:
-			log.Logger.Warn("SIGHUP hit, Nothing supports this currently")
-		case os.Interrupt, syscall.SIGTERM, syscall.SIGINT:
-			log.Logger.Info("Caught Shutdown Signal", zap.String("signal", sig.String()))
-			s.gracefulShutdown()
-		}
-	}
-}
-
-func (s *Scheduler) gracefulShutdown() {
-	// Pause the Context for `ShutdownTimeoutSecs` config value
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(120)*time.Second)
-	defer cancel()
-
-	// Turn off keepalive
-	s.mServer.SetKeepAlivesEnabled(false)
-
-	if err := s.mServer.Shutdown(ctx); err != nil {
-		panic("HTTP Metrics Server Failed Graceful Shutdown")
-	}
-	if err := log.Logger.Sync(); err != nil {
-		// not much to do here
-	}
+func (s *Scheduler) Stop() {
 	s.worker.Stop()
 	close(s.done)
 }

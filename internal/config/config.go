@@ -30,6 +30,7 @@ type Config struct {
 	S3Bucket               string        `split_words:"true" required:"true"`
 	AWSRegion              string        `split_words:"true" required:"true"`
 	MetricsPort            int           `split_words:"true" default:"3001"`
+	Port                   int           `split_words:"true" default:"8080"`
 	EnableNodeGroup        bool          `split_words:"true" default:"false"`
 }
 
