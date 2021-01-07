@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 
 	uuid "github.com/satori/go.uuid"
+	"gitlab.unanet.io/devops/eve/pkg/eve"
 	"gitlab.unanet.io/devops/eve/pkg/queue"
 	"gitlab.unanet.io/devops/go/pkg/errors"
 	"gitlab.unanet.io/devops/go/pkg/middleware"
 
 	"gitlab.unanet.io/devops/eve-sch/internal/service"
-	"gitlab.unanet.io/devops/eve-sch/pkg/sdk"
 )
 
 func NewManager(w *queue.Worker, apiQUrl string) *Manager {
@@ -25,7 +25,7 @@ type Manager struct {
 	apiQUrl string
 }
 
-func (m *Manager) Callback(ctx context.Context, id uuid.UUID, message sdk.CallbackMessage) error {
+func (m *Manager) Callback(ctx context.Context, id uuid.UUID, message eve.CallbackMessage) error {
 	messageJson, err := json.Marshal(message)
 	if err != nil {
 		return errors.Wrap(err)

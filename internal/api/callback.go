@@ -6,11 +6,11 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/go-chi/render"
 	uuid "github.com/satori/go.uuid"
+	"gitlab.unanet.io/devops/eve/pkg/eve"
 	"gitlab.unanet.io/devops/go/pkg/errors"
 	"gitlab.unanet.io/devops/go/pkg/json"
 
 	"gitlab.unanet.io/devops/eve-sch/internal/service/callback"
-	"gitlab.unanet.io/devops/eve-sch/pkg/sdk"
 )
 
 type CallbackController struct {
@@ -28,7 +28,7 @@ func (c CallbackController) Setup(r chi.Router) {
 }
 
 func (c CallbackController) callback(w http.ResponseWriter, r *http.Request) {
-	var m sdk.CallbackMessage
+	var m eve.CallbackMessage
 	if err := json.ParseBody(r, &m); err != nil {
 		render.Respond(w, r, err)
 		return
