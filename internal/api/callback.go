@@ -51,6 +51,4 @@ func (c CallbackController) callback(w http.ResponseWriter, r *http.Request) {
 		render.Respond(w, r, err)
 		return
 	}
-
-	render.Status(r, http.StatusAccepted)
 }

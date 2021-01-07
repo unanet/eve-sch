@@ -69,7 +69,7 @@ func (c *Callback) Message(messages ...string) {
 		failFn(err)
 		return
 	}
-	if resp.StatusCode != http.StatusAccepted {
+	if resp.StatusCode != http.StatusOK {
 		failFn(errors.Wrapf("failed to send callback message to eve-sch, status: %d", resp.StatusCode))
 		return
 	}
