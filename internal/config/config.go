@@ -5,9 +5,10 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
-	"gitlab.unanet.io/devops/eve-sch/internal/vault"
 	"gitlab.unanet.io/devops/go/pkg/log"
 	"go.uber.org/zap"
+
+	"gitlab.unanet.io/devops/eve-sch/internal/vault"
 )
 
 var (
@@ -20,6 +21,7 @@ type VaultConfig = vault.Config
 type Config struct {
 	VaultConfig
 	ApiQUrl                string        `split_words:"true" required:"true"`
+	Namespace              string        `split_words:"true" required:"true"`
 	SchQUrl                string        `split_words:"true" required:"true"`
 	SchQWaitTimeSecond     int64         `split_words:"true" default:"20"`
 	SchQVisibilityTimeout  int64         `split_words:"true" default:"3600"`

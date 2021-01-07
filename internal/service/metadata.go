@@ -3,11 +3,15 @@ package service
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"strings"
 
 	"github.com/docker/docker/utils/templates"
+	uuid "github.com/satori/go.uuid"
 	"gitlab.unanet.io/devops/eve/pkg/eve"
+
+	"gitlab.unanet.io/devops/eve-sch/internal/config"
 )
 
 type TemplateServiceData struct {
@@ -59,7 +63,7 @@ func ParseServiceMetadata(metadata map[string]interface{}, service *eve.DeploySe
 		return nil, err
 	}
 
-	return overrideMetaData(returnMap, plan.MetadataOverrides), nil
+	return overrideMetaData(returnMap, plan.DeploymentID, plan.MetadataOverrides), nil
 }
 
 func ParseMigrationMetadata(metadata map[string]interface{}, migration *eve.DeployMigration, plan *eve.NSDeploymentPlan) (map[string]interface{}, error) {
@@ -88,15 +92,17 @@ func ParseMigrationMetadata(metadata map[string]interface{}, migration *eve.Depl
 		return nil, err
 	}
 
-	return overrideMetaData(returnMap, plan.MetadataOverrides), nil
+	return overrideMetaData(returnMap, plan.DeploymentID, plan.MetadataOverrides), nil
 }
 
-func overrideMetaData(m map[string]interface{}, overrides eve.MetadataField) map[string]interface{} {
+func overrideMetaData(m map[string]interface{}, id uuid.UUID, overrides eve.MetadataField) map[string]interface{} {
 	if overrides != nil && len(overrides) > 0 {
 		for k, v := range overrides {
 			m[k] = v
 		}
 	}
+	c := config.GetConfig()
+	m["EVE_CALLBACK_URL"] = fmt.Sprintf("http://eve-sch-v1.%s:%d/callback?id=%s", c.Namespace, c.Port, id.String())
 	return m
 }
 
@@ -126,5 +132,5 @@ func ParseJobMetadata(metadata map[string]interface{}, job *eve.DeployJob, plan 
 		return nil, err
 	}
 
-	return overrideMetaData(returnMap, plan.MetadataOverrides), nil
+	return overrideMetaData(returnMap, plan.DeploymentID, plan.MetadataOverrides), nil
 }

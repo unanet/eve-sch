@@ -14,6 +14,7 @@ import (
 	"gitlab.unanet.io/devops/eve-sch/internal/config"
 	"gitlab.unanet.io/devops/eve-sch/internal/fn"
 	"gitlab.unanet.io/devops/eve-sch/internal/service"
+	"gitlab.unanet.io/devops/eve-sch/internal/service/callback"
 	"gitlab.unanet.io/devops/eve-sch/internal/vault"
 )
 
@@ -50,7 +51,8 @@ func main() {
 	scheduler := service.NewScheduler(worker, s3Downloader, s3Uploader, c.ApiQUrl, vaultClient, fnTrigger)
 	scheduler.Start()
 
-	controllers, err := api.InitializeControllers()
+	callbackManager := callback.NewManager(worker, c.ApiQUrl)
+	controllers, err := api.InitializeControllers(callbackManager)
 	if err != nil {
 		log.Logger.Panic("Unable to Initialize the Controllers")
 	}

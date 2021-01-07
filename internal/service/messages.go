@@ -10,7 +10,7 @@ import (
 
 const (
 	CommandUpdateDeployment string = "api-update-deployment"
-	GroupUpdateDeployment   string = "api-update-deployment"
+	CommandCallbackMessage  string = "api-callback-message"
 )
 
 func (s *Scheduler) handleMessage(ctx context.Context, m *queue.M) error {
@@ -88,7 +88,7 @@ func (s *Scheduler) deployNamespace(ctx context.Context, m *queue.M) error {
 	err = s.worker.Message(ctx, s.apiQUrl, &queue.M{
 		ID:      m.ID,
 		ReqID:   queue.GetReqID(ctx),
-		GroupID: GroupUpdateDeployment,
+		GroupID: CommandUpdateDeployment,
 		Body:    mBody,
 		Command: CommandUpdateDeployment,
 	})
