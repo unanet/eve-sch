@@ -3,6 +3,7 @@ package sdk
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -63,4 +64,8 @@ func (c *Callback) Message(messages ...string) error {
 		return errors.Wrapf("failed to send callback message to eve-sch, status: %d", resp.StatusCode)
 	}
 	return nil
+}
+
+func (c *Callback) Messagef(message string, a ...interface{}) error {
+	return c.Message(fmt.Sprintf(message, a...))
 }
