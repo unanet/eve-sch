@@ -10,6 +10,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"gitlab.unanet.io/devops/go/pkg/errors"
 	chttp "gitlab.unanet.io/devops/go/pkg/http"
+	"go.uber.org/zap"
 )
 
 type CallbackConfig struct {
@@ -21,9 +22,10 @@ type Callback struct {
 	timeout   time.Duration
 	userAgent string
 	client    *http.Client
+	l         *zap.Logger
 }
 
-func NewCallback() (*Callback, error) {
+func NewCallback(logger *zap.Logger) (*Callback, error) {
 	c := CallbackConfig{}
 	err := envconfig.Process("EVE", &c)
 	if err != nil {
@@ -34,6 +36,7 @@ func NewCallback() (*Callback, error) {
 		userAgent: "eve-sch/sdk",
 		url:       c.CallbackUrl,
 		timeout:   time.Duration(15) * time.Second,
+		l:         logger,
 	}
 
 	api.client = &http.Client{
@@ -44,28 +47,34 @@ func NewCallback() (*Callback, error) {
 	return api, nil
 }
 
-func (c *Callback) Message(messages ...string) error {
+func (c *Callback) Message(messages ...string) {
+	failFn := func(err error) {
+		c.l.Error("callback message failed", zap.Error(err), zap.String("messages", fmt.Sprintf("%v", messages)))
+	}
 	messagesJson, err := json.Marshal(&CallbackMessage{Messages: messages})
 	if err != nil {
-		return errors.Wrap(err)
+		failFn(err)
+		return
 	}
 
 	req, err := http.NewRequest(http.MethodPost, c.url, bytes.NewBuffer(messagesJson))
 	if err != nil {
-		return errors.Wrap(err)
+		failFn(err)
+		return
 	}
 
 	req.Header.Set("User-Agent", c.userAgent)
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return errors.Wrap(err)
+		failFn(err)
+		return
 	}
 	if resp.StatusCode != http.StatusAccepted {
-		return errors.Wrapf("failed to send callback message to eve-sch, status: %d", resp.StatusCode)
+		failFn(errors.Wrapf("failed to send callback message to eve-sch, status: %d", resp.StatusCode))
+		return
 	}
-	return nil
 }
 
-func (c *Callback) Messagef(message string, a ...interface{}) error {
-	return c.Message(fmt.Sprintf(message, a...))
+func (c *Callback) Messagef(message string, a ...interface{}) {
+	c.Message(fmt.Sprintf(message, a...))
 }
