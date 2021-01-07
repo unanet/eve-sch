@@ -43,11 +43,13 @@ func (c CallbackController) callback(w http.ResponseWriter, r *http.Request) {
 	jobID, err := uuid.FromString(id)
 	if err != nil {
 		render.Respond(w, r, errors.NewRestError(400, "id is invalid"))
+		return
 	}
 
 	err = c.manager.Callback(r.Context(), jobID, m)
 	if err != nil {
 		render.Respond(w, r, err)
+		return
 	}
 
 	render.Status(r, http.StatusAccepted)
