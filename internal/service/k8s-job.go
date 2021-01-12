@@ -104,7 +104,7 @@ func (s *Scheduler) hydrateK8sJob(ctx context.Context, plan *eve.NSDeploymentPla
 							Name:            job.ArtifactName,
 							ImagePullPolicy: apiv1.PullAlways,
 							Image:           getDockerImageName(job.DeployArtifact),
-							Env:             containerEnvVars(job.Metadata),
+							Env:             containerEnvVars(plan.DeploymentID, job.DeployArtifact),
 						},
 					},
 					ImagePullSecrets: imagePullSecrets,

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"gitlab.unanet.io/devops/eve-sch/internal/config"
+	uuid "github.com/satori/go.uuid"
 	"gitlab.unanet.io/devops/eve/pkg/eve"
 	"go.uber.org/zap"
 	appsv1 "k8s.io/api/apps/v1"
@@ -16,6 +16,8 @@ import (
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+
+	"gitlab.unanet.io/devops/eve-sch/internal/config"
 )
 
 // Public CONST
@@ -45,9 +47,10 @@ func int32Ptr(i int) *int32 {
 
 func int64Ptr(i int64) *int64 { return &i }
 
-func containerEnvVars(metadata map[string]interface{}) []apiv1.EnvVar {
+func containerEnvVars(deploymentID uuid.UUID, artifact *eve.DeployArtifact) []apiv1.EnvVar {
+	c := config.GetConfig()
 	var containerEnvVars []apiv1.EnvVar
-	for k, v := range metadata {
+	for k, v := range artifact.Metadata {
 		value, ok := v.(string)
 		if !ok {
 			continue
@@ -57,6 +60,17 @@ func containerEnvVars(metadata map[string]interface{}) []apiv1.EnvVar {
 			Value: value,
 		})
 	}
+
+	containerEnvVars = append(containerEnvVars, apiv1.EnvVar{
+		Name:  "EVE_CALLBACK_URL",
+		Value: fmt.Sprintf("http://eve-sch-v1.%s:%d/callback?id=%s", c.Namespace, c.Port, deploymentID.String()),
+	})
+
+	containerEnvVars = append(containerEnvVars, apiv1.EnvVar{
+		Name:  "EVE_IMAGE_NAME",
+		Value: getDockerImageName(artifact),
+	})
+
 	return containerEnvVars
 }
 
@@ -190,7 +204,6 @@ func serviceLabels(service *eve.DeployService) map[string]string {
 }
 
 func (s *Scheduler) hydrateK8sDeployment(ctx context.Context, plan *eve.NSDeploymentPlan, service *eve.DeployService, nuance string) (*appsv1.Deployment, error) {
-
 	deployment := &appsv1.Deployment{
 		TypeMeta: deploymentMetaData,
 		ObjectMeta: metav1.ObjectMeta{
@@ -222,7 +235,7 @@ func (s *Scheduler) hydrateK8sDeployment(ctx context.Context, plan *eve.NSDeploy
 							ImagePullPolicy: apiv1.PullAlways,
 							Image:           getDockerImageName(service.DeployArtifact),
 							Ports:           getServiceContainerPorts(service),
-							Env:             containerEnvVars(service.Metadata),
+							Env:             containerEnvVars(plan.DeploymentID, service.DeployArtifact),
 						},
 					},
 					TerminationGracePeriodSeconds: int64Ptr(300),
