@@ -49,6 +49,9 @@ func int64Ptr(i int64) *int64 { return &i }
 
 func containerEnvVars(deploymentID uuid.UUID, artifact *eve.DeployArtifact) []apiv1.EnvVar {
 	c := config.GetConfig()
+	artifact.Metadata["EVE_CALLBACK_URL"] = fmt.Sprintf("http://eve-sch-v1.%s:%d/callback?id=%s", c.Namespace, c.Port, deploymentID.String())
+	artifact.Metadata["EVE_IMAGE_NAME"] = getDockerImageName(artifact)
+
 	var containerEnvVars []apiv1.EnvVar
 	for k, v := range artifact.Metadata {
 		value, ok := v.(string)
@@ -60,16 +63,6 @@ func containerEnvVars(deploymentID uuid.UUID, artifact *eve.DeployArtifact) []ap
 			Value: value,
 		})
 	}
-
-	containerEnvVars = append(containerEnvVars, apiv1.EnvVar{
-		Name:  "EVE_CALLBACK_URL",
-		Value: fmt.Sprintf("http://eve-sch-v1.%s:%d/callback?id=%s", c.Namespace, c.Port, deploymentID.String()),
-	})
-
-	containerEnvVars = append(containerEnvVars, apiv1.EnvVar{
-		Name:  "EVE_IMAGE_NAME",
-		Value: getDockerImageName(artifact),
-	})
 
 	return containerEnvVars
 }
