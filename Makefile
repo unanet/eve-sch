@@ -7,7 +7,7 @@ MODCACHE ?= ${GOPATH}/pkg/mod
 
 VERSION_MAJOR := 0
 VERSION_MINOR := 10
-VERSION_PATCH := 0
+VERSION_PATCH := 1
 BUILD_NUMBER := ${CI_PIPELINE_IID}
 PATCH_VERSION := ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}
 VERSION := ${PATCH_VERSION}.${BUILD_NUMBER}
@@ -48,10 +48,14 @@ docker-exec = docker run --rm \
 	-w /src \
 	${BUILD_IMAGE}
 
+check-tag = !(git rev-parse -q --verify "refs/tags/v${PATCH_VERSION}" > /dev/null 2>&1) || echo "the version: ${PATCH_VERSION} has been released already"; exit 1
 
-.PHONY: build dist test
+.PHONY: build dist test check_version
 
-build:
+check_version:
+	@$(check-tag)
+
+build: check_version
 	docker pull ${BUILD_IMAGE}
 	docker pull unanet-docker.jfrog.io/alpine-base
 	mkdir -p bin
