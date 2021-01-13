@@ -48,7 +48,8 @@ docker-exec = docker run --rm \
 	-w /src \
 	${BUILD_IMAGE}
 
-check-tag = !(git rev-parse -q --verify "refs/tags/v${PATCH_VERSION}" > /dev/null 2>&1) || echo "the version: ${PATCH_VERSION} has been released already"; exit 1
+check-tag = !(git rev-parse -q --verify "refs/tags/v${PATCH_VERSION}" > /dev/null 2>&1) || \
+	(echo "the version: ${PATCH_VERSION} has been released already" && exit 1)
 
 .PHONY: build dist test check_version
 
