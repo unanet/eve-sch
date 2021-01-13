@@ -4,20 +4,17 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/pkg/errors"
+	"gitlab.unanet.io/devops/eve/pkg/eve"
 	"gitlab.unanet.io/devops/go/pkg/log"
 	"gitlab.unanet.io/devops/go/pkg/retry"
-
+	batchv1 "k8s.io/api/batch/v1"
+	apiv1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
-
-	"github.com/pkg/errors"
-
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
 	"gitlab.unanet.io/devops/eve-sch/internal/config"
-	"gitlab.unanet.io/devops/eve/pkg/eve"
-	batchv1 "k8s.io/api/batch/v1"
-	apiv1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
