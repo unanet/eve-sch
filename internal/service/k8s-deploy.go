@@ -51,8 +51,6 @@ func containerEnvVars(deploymentID uuid.UUID, artifact *eve.DeployArtifact) []ap
 	c := config.GetConfig()
 	artifact.Metadata["EVE_CALLBACK_URL"] = fmt.Sprintf("http://eve-sch-v1.%s:%d/callback?id=%s", c.Namespace, c.Port, deploymentID.String())
 	artifact.Metadata["EVE_IMAGE_NAME"] = getDockerImageName(artifact)
-	artifact.Metadata["EVE_RUN_AS"] = artifact.RunAs
-	artifact.Metadata["EVE_SERVICE_ACCOUNT"] = artifact.ServiceAccount
 
 	var containerEnvVars []apiv1.EnvVar
 	for k, v := range artifact.Metadata {
