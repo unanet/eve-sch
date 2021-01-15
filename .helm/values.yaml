@@ -11,4 +11,4 @@ vaultK8sClusterName:
 serviceAccount: "eve-sch"
 image: "unanet-docker-prod.jfrog.io/ops/eve-sch-v1:0.10.2"
 initLogLevel: "INFO"
-eveNamespace: "eve"
+eveNS: "eve"

@@ -50,7 +50,7 @@ spec:
             - name: INIT_LOG_LEVEL
               value: { { .Values.initLogLevel } }
             - name: EVE_NAMESPACE
-              value: { { .Values.eveNamespace } }
+              value: { { .Values.eveNS } }
           ports:
             - containerPort: 3001
               name: metrics
