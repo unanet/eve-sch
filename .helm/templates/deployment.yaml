@@ -3,7 +3,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: eve-sch-v1
-  namespace: { { .Release.Namespace } }
+  namespace: {{ .Release.Namespace }}
 spec:
   selector:
     matchLabels:
@@ -17,40 +17,40 @@ spec:
       labels:
         app: eve-sch-v1
     spec:
-      serviceAccountName: { { .Values.serviceAccount } }
+      serviceAccountName: {{ .Values.serviceAccount }}
       securityContext:
         runAsUser: 1101
         runAsGroup: 1101
         fsGroup: 65534
       containers:
         - name: eve-sch-v1
-          image: { { .Values.image } }
+          image: {{ .Values.image }}
           imagePullPolicy: Always
           env:
             - name: EVE_API_Q_URL
-              value: { { .Values.eveApiQUrl } }
+              value: {{ .Values.eveApiQUrl }}
             - name: EVE_SCH_Q_URL
-              value: { { .Values.eveSchQUrl } }
+              value: {{ .Values.eveSchQUrl }}
             - name: EVE_S3_BUCKET
-              value: { { .Values.eveS3Bucket } }
+              value: {{ .Values.eveS3Bucket }}
             - name: EVE_AWS_REGION
-              value: { { .Values.eveAWSRegion } }
+              value: {{ .Values.eveAWSRegion }}
             - name: AWS_ACCESS_KEY_ID
-              value: { { .Values.awsAccessKeyID } }
+              value: {{ .Values.awsAccessKeyID }}
             - name: AWS_SECRET_ACCESS_KEY
-              value: { { .Values.awsSecretAccessKey } }
+              value: {{ .Values.awsSecretAccessKey }}
             - name: VAULT_ROLE
-              value: { { .Values.vaultRole } }
+              value: {{ .Values.vaultRole }}
             - name: VAULT_ADDR
-              value: { { .Values.vaultAddr } }
+              value: {{ .Values.vaultAddr }}
             - name: VAULT_K8S_MOUNT
-              value: { { .Values.vaultK8sMount } }
+              value: {{ .Values.vaultK8sMount }}
             - name: VAULT_K8S_CLUSTER_NAME
-              value: { { .Values.vaultK8sClusterName } }
+              value: {{ .Values.vaultK8sClusterName }}
             - name: INIT_LOG_LEVEL
-              value: { { .Values.initLogLevel } }
+              value: {{ .Values.initLogLevel }}
             - name: EVE_NAMESPACE
-              value: { { .Values.eveNS } }
+              value: {{ .Values.eveNS }}
           ports:
             - containerPort: 3001
               name: metrics
