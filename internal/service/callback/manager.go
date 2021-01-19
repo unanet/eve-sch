@@ -32,11 +32,12 @@ func (m *Manager) Callback(ctx context.Context, id uuid.UUID, message eve.Callba
 	}
 
 	err = m.worker.Message(ctx, m.apiQUrl, &queue.M{
-		ID:      id,
-		ReqID:   middleware.GetReqID(ctx),
-		GroupID: service.CommandCallbackMessage,
-		Body:    messageJson,
-		Command: service.CommandCallbackMessage,
+		ID:       id,
+		ReqID:    middleware.GetReqID(ctx),
+		GroupID:  service.CommandCallbackMessage,
+		Body:     messageJson,
+		Command:  service.CommandCallbackMessage,
+		DedupeID: uuid.NewV4().String(),
 	})
 
 	if err != nil {

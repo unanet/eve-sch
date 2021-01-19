@@ -36,7 +36,7 @@ func (c CallbackController) callback(w http.ResponseWriter, r *http.Request) {
 
 	id := r.URL.Query().Get("id")
 	if id == "" {
-		render.Respond(w, r, errors.NewRestError(400, "you must pay id as a query parameter"))
+		render.Respond(w, r, errors.NewRestError(400, "you must supply id as a query parameter"))
 		return
 	}
 
