@@ -24,7 +24,7 @@ func (c PingController) Setup(r chi.Router) {
 }
 
 func (c PingController) restError(w http.ResponseWriter, r *http.Request) {
-	render.Respond(w, r, &errors.RestError{
+	render.Respond(w, r, errors.RestError{
 		Code:          400,
 		Message:       "Bad Request",
 		OriginalError: nil,
