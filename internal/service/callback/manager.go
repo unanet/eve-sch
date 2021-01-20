@@ -8,7 +8,6 @@ import (
 	"gitlab.unanet.io/devops/eve/pkg/eve"
 	"gitlab.unanet.io/devops/eve/pkg/queue"
 	"gitlab.unanet.io/devops/go/pkg/errors"
-	"gitlab.unanet.io/devops/go/pkg/middleware"
 
 	"gitlab.unanet.io/devops/eve-sch/internal/service"
 )
@@ -33,7 +32,6 @@ func (m *Manager) Callback(ctx context.Context, id uuid.UUID, message eve.Callba
 
 	err = m.worker.Message(ctx, m.apiQUrl, &queue.M{
 		ID:       id,
-		ReqID:    middleware.GetReqID(ctx),
 		GroupID:  service.CommandCallbackMessage,
 		Body:     messageJson,
 		Command:  service.CommandCallbackMessage,

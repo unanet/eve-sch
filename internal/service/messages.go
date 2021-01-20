@@ -87,7 +87,6 @@ func (s *Scheduler) deployNamespace(ctx context.Context, m *queue.M) error {
 
 	err = s.worker.Message(ctx, s.apiQUrl, &queue.M{
 		ID:      m.ID,
-		ReqID:   queue.GetReqID(ctx),
 		GroupID: CommandUpdateDeployment,
 		Body:    mBody,
 		Command: CommandUpdateDeployment,

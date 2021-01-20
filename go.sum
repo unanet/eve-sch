@@ -632,12 +632,16 @@ gitlab.unanet.io/devops/eve v0.6.1-0.20210107221943-4f5cddfc7a1e h1:4YVDptmlgFHY
 gitlab.unanet.io/devops/eve v0.6.1-0.20210107221943-4f5cddfc7a1e/go.mod h1:8aUcwULncKD2b706qEVGimjKcYv6HgACkd6FUDebz3s=
 gitlab.unanet.io/devops/eve v0.10.4 h1:V401iZ1x747ReQ0oeBMfe/gNx+XLKMGohos4h80xKRU=
 gitlab.unanet.io/devops/eve v0.10.4/go.mod h1:Jlvbdu9uZ0no3XyB654YXjjoVDxlxIlxEh0qxQXq/Hc=
+gitlab.unanet.io/devops/eve v0.10.5-0.20210120212652-7ec24d3d69bb h1:fVBfZdiw0BPNCvkYtbJ8ppYstn8B4KGXqD2UghdabPg=
+gitlab.unanet.io/devops/eve v0.10.5-0.20210120212652-7ec24d3d69bb/go.mod h1:OOMDPQettc/wBI+CZmV53fzcxmxndZz7PoJSKCpEds4=
 gitlab.unanet.io/devops/go v0.6.0 h1:HC43yg/lyzHlWSyS1vIH2F32FuLEZWK+G36s1krvG14=
 gitlab.unanet.io/devops/go v0.6.0/go.mod h1:4mOA9RxmdSHnHCh7wZ4cSSJC756VmFA4AjNOLfNhtPk=
 gitlab.unanet.io/devops/go v1.0.4 h1:i52tQAD4eOj68Ss6O2ijgT3Cvn5hDepjG30P43WE4dg=
 gitlab.unanet.io/devops/go v1.0.4/go.mod h1:4mOA9RxmdSHnHCh7wZ4cSSJC756VmFA4AjNOLfNhtPk=
 gitlab.unanet.io/devops/go v1.0.6 h1:j7bs62tlIoQdqYSra+snyvn7HaCyS3uQdC13/3UjTaE=
 gitlab.unanet.io/devops/go v1.0.6/go.mod h1:y2N2McFeZU4N3yRHnq0q+q0RTUf2eYQCmKmBpnIpfKs=
+gitlab.unanet.io/devops/go v1.0.7 h1:UZG8k07+gvKOj2vKJxeoeFEtLH5ZMOh4lVQhTxEM52Y=
+gitlab.unanet.io/devops/go v1.0.7/go.mod h1:y2N2McFeZU4N3yRHnq0q+q0RTUf2eYQCmKmBpnIpfKs=
 go.etcd.io/bbolt v1.3.3/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738/go.mod h1:dnLIgRNXwCJa5e+c6mIZCrds/GIG4ncV9HhK5PX7jPg=
 go.mongodb.org/mongo-driver v1.1.0/go.mod h1:u7ryQJ+DOzQmeO7zB6MHyr8jkEQvC8vH7qLUO4lqsUM=
