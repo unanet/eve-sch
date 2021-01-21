@@ -55,20 +55,6 @@ func (s *Scheduler) deployNamespace(ctx context.Context, m *queue.M) error {
 		}
 	}
 
-	for _, x := range plan.Migrations {
-		x.Metadata, err = ParseMigrationMetadata(x.Metadata, x, plan)
-		if err != nil {
-			plan.Message("could not parse metadata, migration: %s, error: %s", x.ArtifactName, err)
-		}
-
-		if x.ArtifactoryFeedType == eve.ArtifactoryFeedTypeDocker {
-			s.runDockerMigrationJob(ctx, x, plan)
-		}
-		if len(x.ArtifactFnPtr) > 0 {
-			s.triggerFunction(ctx, x.DatabaseName, x.DeployArtifact, plan)
-		}
-	}
-
 	err = s.worker.DeleteMessage(ctx, m)
 	if err != nil {
 		return errors.Wrap(err)
