@@ -4,22 +4,14 @@ CI_PROJECT_ID ?= 0
 CI_PIPELINE_IID ?= 0
 GOPATH ?= ${HOME}/go
 MODCACHE ?= ${GOPATH}/pkg/mod
-
-VERSION_MAJOR := 0
-VERSION_MINOR := 10
-VERSION_PATCH := 6
 BUILD_NUMBER := ${CI_PIPELINE_IID}
-PATCH_VERSION := ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}
+PATCH_VERSION := $(shell cat VERSION)
 VERSION := ${PATCH_VERSION}.${BUILD_NUMBER}
-
 DOCKER_UID = $(shell id -u)
 DOCKER_GID = $(shell id -g)
-
 CUR_DIR := $(shell pwd)
-
 BUILD_IMAGE := unanet-docker.jfrog.io/golang
 IMAGE_NAME := unanet-docker-int.jfrog.io/ops/eve-sch-v1
-
 LABEL_PREFIX := com.unanet
 IMAGE_LABELS := \
 	--label "${LABEL_PREFIX}.git_commit_sha=${CI_COMMIT_SHORT_SHA}" \
@@ -32,12 +24,7 @@ docker-scanner-exec = docker run --rm \
 	-e SONAR_HOST_URL=https://sonarqube.unanet.io \
 	-v $(CUR_DIR):/usr/src \
 	--user="${DOCKER_UID}:${DOCKER_GID}" \
-	sonarsource/sonar-scanner-cli	
-
-docker-helm-exec = docker run --rm --user ${DOCKER_UID}:${DOCKER_UID} \
-	-v ${CUR_DIR}:/src \
-	-w /src \
-	alpine/helm
+	sonarsource/sonar-scanner-cli sonar-scanner -Dsonar.projectKey=eve-sch -Dsonar.exclusions=**/*_test.go,**/*mock*.go
 
 docker-exec = docker run --rm \
 	-e DOCKER_UID=${DOCKER_UID} \
@@ -47,6 +34,11 @@ docker-exec = docker run --rm \
 	-v ${HOME}/.ssh/id_rsa:/home/unanet/.ssh/id_rsa \
 	-w /src \
 	${BUILD_IMAGE}
+
+docker-helm-exec = docker run --rm --user ${DOCKER_UID}:${DOCKER_UID} \
+	-v ${CUR_DIR}:/src \
+	-w /src \
+	alpine/helm
 
 check-tag = !(git rev-parse -q --verify "refs/tags/v${PATCH_VERSION}" > /dev/null 2>&1) || \
 	(echo "the version: ${PATCH_VERSION} has been released already" && exit 1)
