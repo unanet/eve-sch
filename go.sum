@@ -642,6 +642,8 @@ gitlab.unanet.io/devops/go v1.0.6 h1:j7bs62tlIoQdqYSra+snyvn7HaCyS3uQdC13/3UjTaE
 gitlab.unanet.io/devops/go v1.0.6/go.mod h1:y2N2McFeZU4N3yRHnq0q+q0RTUf2eYQCmKmBpnIpfKs=
 gitlab.unanet.io/devops/go v1.0.7 h1:UZG8k07+gvKOj2vKJxeoeFEtLH5ZMOh4lVQhTxEM52Y=
 gitlab.unanet.io/devops/go v1.0.7/go.mod h1:y2N2McFeZU4N3yRHnq0q+q0RTUf2eYQCmKmBpnIpfKs=
+gitlab.unanet.io/devops/go v1.0.8 h1:EHj7B6G9E76Q3QXTs9UK81mWK8VVQheXoPyZZ/jRSC4=
+gitlab.unanet.io/devops/go v1.0.8/go.mod h1:QQeM1eG47tMVGfqDDsiuyNC4eg3i6OphK2JDTKqqoEM=
 go.etcd.io/bbolt v1.3.3/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738/go.mod h1:dnLIgRNXwCJa5e+c6mIZCrds/GIG4ncV9HhK5PX7jPg=
 go.mongodb.org/mongo-driver v1.1.0/go.mod h1:u7ryQJ+DOzQmeO7zB6MHyr8jkEQvC8vH7qLUO4lqsUM=
