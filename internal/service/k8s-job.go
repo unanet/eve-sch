@@ -187,7 +187,7 @@ func (s *Scheduler) watchJobPods(
 	watch, err := pods.Watch(ctx, metav1.ListOptions{
 		TypeMeta:       metav1.TypeMeta{},
 		LabelSelector:  jobLabelSelector(job),
-		TimeoutSeconds: int64Ptr(config.GetConfig().K8sDeployTimeoutSec),
+		TimeoutSeconds: int64Ptr(config.GetConfig().K8sJobTimeoutSec),
 	})
 	if err != nil {
 		return errors.Wrap(err, "an error occurred trying to watch the pods, job may have succeeded")
@@ -236,7 +236,7 @@ func (s *Scheduler) runDockerJob(ctx context.Context, job *eve.DeployJob, plan *
 
 	if job.ExitCode != 0 {
 		if job.ExitCode == TimeoutExitCode {
-			logFn("timeout of %d seconds exceeded while waiting for the pod to start", config.GetConfig().K8sDeployTimeoutSec)
+			logFn("timeout of %d seconds exceeded while waiting for the job to run", config.GetConfig().K8sJobTimeoutSec)
 		} else {
 			logFn("pod failed to start and returned a non zero exit code: %d", job.ExitCode)
 		}

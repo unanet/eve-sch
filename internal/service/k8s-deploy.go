@@ -384,7 +384,7 @@ func (s *Scheduler) deployDockerService(ctx context.Context, service *eve.Deploy
 
 	if service.ExitCode != 0 {
 		if service.ExitCode == TimeoutExitCode {
-			logFn("timeout of %d seconds exceeded while waiting for the pod to start", config.GetConfig().K8sDeployTimeoutSec)
+			logFn("timeout of %d seconds exceeded while waiting for the service to start", config.GetConfig().K8sDeployTimeoutSec)
 		} else {
 			logFn("pod failed to start and returned a non zero exit code: %d", service.ExitCode)
 		}

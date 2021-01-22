@@ -26,9 +26,10 @@ type Config struct {
 	SchQWaitTimeSecond     int64         `split_words:"true" default:"20"`
 	SchQVisibilityTimeout  int64         `split_words:"true" default:"3600"`
 	SchQMaxNumberOfMessage int64         `split_words:"true" default:"5"`
-	SchQWorkerTimeout      time.Duration `split_words:"true" default:"3500s"`
+	SchQWorkerTimeout      time.Duration `split_words:"true" default:"7200s"`
 	FnTriggerTimeout       time.Duration `split_words:"true" default:"300s"`
 	K8sDeployTimeoutSec    int64         `split_words:"true" default:"300"`
+	K8sJobTimeoutSec       int64         `split_words:"true" default:"3600"`
 	S3Bucket               string        `split_words:"true" required:"true"`
 	AWSRegion              string        `split_words:"true" required:"true"`
 	MetricsPort            int           `split_words:"true" default:"3001"`
