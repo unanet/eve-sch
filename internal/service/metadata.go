@@ -27,7 +27,7 @@ func replace(input, from, to string) string {
 func ParseServiceMetadata(metadata map[string]interface{}, service *eve.DeployService, plan *eve.NSDeploymentPlan) (map[string]interface{}, error) {
 	metadataJson, err := json.Marshal(metadata)
 	if err != nil {
-		return nil, err
+		return map[string]interface{}{}, err
 	}
 
 	temp := template.New("metadata")
@@ -36,7 +36,7 @@ func ParseServiceMetadata(metadata map[string]interface{}, service *eve.DeploySe
 	})
 	temp, err = temp.Parse(string(metadataJson))
 	if err != nil {
-		return nil, err
+		return map[string]interface{}{}, err
 	}
 
 	var b bytes.Buffer
@@ -51,7 +51,7 @@ func ParseServiceMetadata(metadata map[string]interface{}, service *eve.DeploySe
 	var returnMap map[string]interface{}
 	err = json.Unmarshal(b.Bytes(), &returnMap)
 	if err != nil {
-		return nil, err
+		return map[string]interface{}{}, err
 	}
 
 	return overrideMetaData(returnMap, plan.MetadataOverrides), nil
