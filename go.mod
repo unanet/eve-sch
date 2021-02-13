@@ -16,7 +16,7 @@ require (
 	github.com/satori/go.uuid v1.2.0
 	github.com/stretchr/testify v1.4.0
 	gitlab.unanet.io/devops/eve v0.10.11-0.20210121201621-98b2e68ad6b7
-	gitlab.unanet.io/devops/go v1.0.11
+	gitlab.unanet.io/devops/go v1.2.0
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.16.0
 	google.golang.org/appengine v1.6.6 // indirect
