@@ -177,11 +177,18 @@ func deploymentLabelSelector(service *eve.DeployService, timeNuance string) stri
 }
 
 func deploymentLabels(service *eve.DeployService, timeNuance string) map[string]string {
-	return map[string]string{
+	baseLabels := map[string]string{
 		"app":     service.ServiceName,
 		"version": service.AvailableVersion,
 		"nuance":  timeNuance,
 	}
+
+	// If the service has a metrics port we will set up scrape label here
+	if service.MetricsPort > 0 {
+		baseLabels["scrape-metrics"] = "true"
+	}
+
+	return baseLabels
 }
 
 func serviceLabels(service *eve.DeployService) map[string]string {
