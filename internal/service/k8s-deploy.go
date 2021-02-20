@@ -185,7 +185,7 @@ func deploymentLabels(service *eve.DeployService, timeNuance string) map[string]
 
 	// If the service has a metrics port we will set up scrape label here
 	if service.MetricsPort > 0 {
-		baseLabels["scrape-metrics"] = "true"
+		baseLabels["metrics"] = "enabled"
 	}
 
 	return baseLabels
