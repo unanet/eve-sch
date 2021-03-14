@@ -6,8 +6,8 @@ import (
 	"html/template"
 	"strings"
 
-	"github.com/docker/docker/utils/templates"
 	"gitlab.unanet.io/devops/eve/pkg/eve"
+	templates "gitlab.unanet.io/devops/go/pkg/template"
 )
 
 type TemplateServiceData struct {
