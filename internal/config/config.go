@@ -18,6 +18,11 @@ var (
 
 type VaultConfig = vault.Config
 
+// EVE_API_Q_URL
+// EVE_NAMESPACE
+// EVE_SCH_URL
+// EVE_S3_BUCKET
+// EVE_AWS_REGION
 type Config struct {
 	VaultConfig
 	ApiQUrl                string        `split_words:"true" required:"true"`
