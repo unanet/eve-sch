@@ -160,7 +160,6 @@ github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7
 github.com/evanphx/json-patch v4.2.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
 github.com/evanphx/json-patch v4.9.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
 github.com/fatih/color v1.7.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5KwzbycvMj4=
-github.com/fatih/structs v1.1.0/go.mod h1:9NiDSp5zOcgEDl+j00MP/WkGVPOlPRLejGD8Ga6PJ7M=
 github.com/form3tech-oss/jwt-go v3.2.2+incompatible/go.mod h1:pbq4aXjuKjdthFRnoDwaVPLA+WlJuPGy+QneDUgJi2k=
 github.com/franela/goblin v0.0.0-20200105215937-c9ffbefa60db/go.mod h1:7dvUGVsVBjqR7JHJk0brhHOZYGmfBYOrK0ZhYMEtBr4=
 github.com/franela/goreq v0.0.0-20171204163338-bcd34c9993f8/go.mod h1:ZhphrRTfi2rbfLwlschooIH4+wKKDR4Pdxhh+TRoA20=
@@ -587,9 +586,8 @@ github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9de
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/zenazn/goji v0.9.0/go.mod h1:7S9M489iMyHBNxwZnk9/EHS098H4/F6TATF2mIxtB1Q=
 gitlab.com/nyarla/go-crypt v0.0.0-20160106005555-d9a5dc2b789b/go.mod h1:T3BPAOm2cqquPa0MKWeNkmOM5RQsRhkrwMWonFMN7fE=
-gitlab.unanet.io/devops/eve v0.12.1-0.20210315181023-5b0a535764d1 h1:6kXzTOZ8fQUFilNGcz/p38xUfpViAYIwQZ/QddhgbbQ=
-gitlab.unanet.io/devops/eve v0.12.1-0.20210315181023-5b0a535764d1/go.mod h1:Yb/Z/9qPPiAR1GuKo/htz4g+BXbgSHoeAKQBlIcgCmY=
-gitlab.unanet.io/devops/go v1.3.1-0.20210311225929-947329a02b73/go.mod h1:ztV73hE0+l+AjoUfAbCm8w6e3YbG3Hj1r+X08nS/+DA=
+gitlab.unanet.io/devops/eve v0.13.1 h1:Y7qcF52pQMaR0Aiq/ptcIdT7G48Q7RqtDefOGgGkPs8=
+gitlab.unanet.io/devops/eve v0.13.1/go.mod h1:EUeH82uUzT0UcQCS/6N6NSMjdKW++8D3dHZFf0YOu9c=
 gitlab.unanet.io/devops/go v1.4.0 h1:30YudvBSF1UCR75VJGT7Y6DIj+UsLPW9M6N4Q4wJkE8=
 gitlab.unanet.io/devops/go v1.4.0/go.mod h1:ztV73hE0+l+AjoUfAbCm8w6e3YbG3Hj1r+X08nS/+DA=
 go.etcd.io/bbolt v1.3.3/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
