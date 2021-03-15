@@ -1,21 +1,17 @@
 package main
 
 import (
-	"time"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"gitlab.unanet.io/devops/eve-sch/internal/api"
+	"gitlab.unanet.io/devops/eve-sch/internal/config"
+	"gitlab.unanet.io/devops/eve-sch/internal/service"
+	"gitlab.unanet.io/devops/eve-sch/internal/service/callback"
+	"gitlab.unanet.io/devops/eve-sch/internal/vault"
 	"gitlab.unanet.io/devops/eve/pkg/queue"
 	"gitlab.unanet.io/devops/eve/pkg/s3"
 	"gitlab.unanet.io/devops/go/pkg/log"
 	"go.uber.org/zap"
-
-	"gitlab.unanet.io/devops/eve-sch/internal/api"
-	"gitlab.unanet.io/devops/eve-sch/internal/config"
-	"gitlab.unanet.io/devops/eve-sch/internal/fn"
-	"gitlab.unanet.io/devops/eve-sch/internal/service"
-	"gitlab.unanet.io/devops/eve-sch/internal/service/callback"
-	"gitlab.unanet.io/devops/eve-sch/internal/vault"
 )
 
 func main() {
@@ -45,10 +41,8 @@ func main() {
 
 	s3Downloader := s3.NewDownloader(awsSession)
 
-	fnTrigger := fn.NewTrigger(1 * time.Hour)
-
 	worker := queue.NewWorker("eve-sch", schQueue, c.SchQWorkerTimeout)
-	scheduler := service.NewScheduler(worker, s3Downloader, s3Uploader, c.ApiQUrl, vaultClient, fnTrigger)
+	scheduler := service.NewScheduler(worker, s3Downloader, s3Uploader, c.ApiQUrl, vaultClient)
 	scheduler.Start()
 
 	callbackManager := callback.NewManager(worker, c.ApiQUrl)

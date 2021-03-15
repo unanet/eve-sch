@@ -17,31 +17,7 @@ import (
 	"gitlab.unanet.io/devops/eve-sch/internal/config"
 )
 
-var (
-	jobMetaData = metav1.TypeMeta{
-		Kind:       "Job",
-		APIVersion: "batch/v1",
-	}
-)
-
-// TODO: Remove this once migrations are removed and we are full on "Job"
-//  this is still being used bu the k8s-migrations.go setup
-func setupJobEnvironment(metadata map[string]interface{}, job *batchv1.Job) {
-	var containerEnvVars []apiv1.EnvVar
-
-	for k, v := range metadata {
-		value, ok := v.(string)
-		if !ok {
-			continue
-		}
-		containerEnvVars = append(containerEnvVars, apiv1.EnvVar{
-			Name:  k,
-			Value: value,
-		})
-	}
-
-	job.Spec.Template.Spec.Containers[0].Env = containerEnvVars
-}
+var jobMetaData = metav1.TypeMeta{Kind: "Job", APIVersion: "batch/v1"}
 
 func jobLabelSelector(job *eve.DeployJob) string {
 	return fmt.Sprintf("job=%s", job.JobName)

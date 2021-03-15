@@ -16,7 +16,6 @@ import (
 
 	uuid "github.com/satori/go.uuid"
 	"github.com/stretchr/testify/require"
-	"gitlab.unanet.io/devops/eve-sch/internal/fn"
 	"gitlab.unanet.io/devops/eve-sch/internal/vault"
 	"gitlab.unanet.io/devops/eve/pkg/eve"
 	"gitlab.unanet.io/devops/eve/pkg/queue"
@@ -34,7 +33,6 @@ var (
 	mockCloudDownloader = newMockCloudDownloader()
 	mockCloudUploader   = newMockCloudUploader()
 	mockSecretClient    = newMockSecretsClient()
-	mockFnTrigger       = newMockFnTrigger()
 	mockDeploymentPlan  = newMockDeploymentPlan()
 	mockDeployService   = newMockDeployService()
 )
@@ -144,7 +142,6 @@ func TestScheduler_hydrateK8sDeployment(t *testing.T) {
 		done       chan bool
 		apiQUrl    string
 		vault      SecretsClient
-		fnTrigger  FunctionTrigger
 	}
 	type args struct {
 		ctx     context.Context
@@ -170,7 +167,6 @@ func TestScheduler_hydrateK8sDeployment(t *testing.T) {
 				done:       make(chan bool),
 				apiQUrl:    "https://idontknow.com/some-queue",
 				vault:      mockSecretClient,
-				fnTrigger:  mockFnTrigger,
 			},
 			args: args{
 				ctx:     context.Background(),
@@ -191,7 +187,6 @@ func TestScheduler_hydrateK8sDeployment(t *testing.T) {
 				done:       tt.fields.done,
 				apiQUrl:    tt.fields.apiQUrl,
 				vault:      tt.fields.vault,
-				fnTrigger:  tt.fields.fnTrigger,
 			}
 			got, err := s.hydrateK8sDeployment(tt.args.ctx, tt.args.plan, tt.args.service, tt.args.nuance)
 			if err != nil && tt.wantErr == false {
@@ -354,7 +349,6 @@ func newMockDeployService() *eve.DeployService {
 			DefinitionSpec:      make(eve.MetadataField),
 			ArtifactoryFeed:     "artifact-feed",
 			ArtifactoryPath:     "artifact-path",
-			ArtifactFnPtr:       "",
 			ArtifactoryFeedType: "docker",
 			Result:              "",
 			ExitCode:            0,
@@ -403,20 +397,6 @@ func newMockDeploymentPlan() *eve.NSDeploymentPlan {
 		MetadataOverrides: nil,
 		Type:              "application",
 	}
-}
-
-type MockFnTrigger struct {
-}
-
-func (mft *MockFnTrigger) Post(ctx context.Context, url string, code string, body interface{}) (*fn.Response, error) {
-	return &fn.Response{
-		Result:   "something totally fake",
-		Messages: nil,
-	}, nil
-}
-
-func newMockFnTrigger() *MockFnTrigger {
-	return &MockFnTrigger{}
 }
 
 type MockSecretClient struct {
