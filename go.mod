@@ -1,6 +1,6 @@
 module gitlab.unanet.io/devops/eve-sch
 
-go 1.15
+go 1.16
 
 //replace gitlab.unanet.io/devops/eve => ../eve
 
