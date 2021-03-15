@@ -6,7 +6,6 @@ go 1.15
 
 require (
 	github.com/aws/aws-sdk-go v1.37.25
-	github.com/dghubble/sling v1.3.0
 	github.com/go-chi/chi v4.1.2+incompatible
 	github.com/go-chi/render v1.0.1
 	github.com/google/gofuzz v1.2.0 // indirect
@@ -16,7 +15,7 @@ require (
 	github.com/satori/go.uuid v1.2.0
 	github.com/stretchr/testify v1.6.1
 	gitlab.unanet.io/devops/eve v0.12.1-0.20210315181023-5b0a535764d1
-	gitlab.unanet.io/devops/go v1.3.1-0.20210311225929-947329a02b73
+	gitlab.unanet.io/devops/go v1.4.0
 	go.uber.org/zap v1.16.0
 	k8s.io/api v0.20.4
 	k8s.io/apimachinery v0.20.4
