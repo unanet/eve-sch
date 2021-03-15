@@ -26,18 +26,9 @@ const (
 	TimeoutExitCode  = -999999
 )
 
-// Private CONST
-const (
-	defaultNodeGroupLabel = "shared"
-)
-
 var (
-	deploymentMetaData = metav1.TypeMeta{
-		Kind:       "Deployment",
-		APIVersion: "apps/v1",
-	}
-
-	imagePullSecrets = []apiv1.LocalObjectReference{{Name: "docker-cfg"}}
+	deploymentMetaData = metav1.TypeMeta{Kind: "Deployment", APIVersion: "apps/v1"}
+	imagePullSecrets   = []apiv1.LocalObjectReference{{Name: "docker-cfg"}}
 )
 
 func int32Ptr(i int) *int32 {
@@ -116,18 +107,6 @@ func (s *Scheduler) parsePodResource(ctx context.Context, input []byte) (*PodRes
 
 	return &podResource, nil
 }
-
-//func (s *Scheduler) parsePodTemplateSpec(ctx context.Context, input []byte, defType eve.DefinitionType) (*apiv1.PodTemplateSpec, error) {
-//	if len(input) <= 5 {
-//		return nil, nil
-//	}
-//	var podTemplateSpec apiv1.PodTemplateSpec
-//	if err := json.Unmarshal(input, &podTemplateSpec); err != nil {
-//		s.Logger(ctx).Warn("failed to unmarshal the pod template spec", zap.Error(err))
-//		return nil, err
-//	}
-//
-//}
 
 func (s *Scheduler) parseProbe(ctx context.Context, input []byte) (*apiv1.Probe, error) {
 	if len(input) <= 5 {
@@ -215,25 +194,24 @@ func serviceLabels(service *eve.DeployService) map[string]string {
 	return base
 }
 
-func (s *Scheduler) deploymentDefinition(ctx context.Context, definition []byte) (*appsv1.Deployment, error) {
+func (s *Scheduler) parseDefinitionSpec(definition []byte) (eve.DefinitionSpec, error) {
 	var def eve.DefinitionSpec
-	//var def = make(map[string]interface{})
 	if err := json.Unmarshal(definition, &def); err != nil {
-		s.Logger(ctx).Error("failed to unmarshal the definition specs", zap.Error(err))
 		return nil, err
 	}
+	return def, nil
+}
 
+func (s *Scheduler) deploymentDefinition(def eve.DefinitionSpec) (*appsv1.Deployment, error) {
 	deployment := &appsv1.Deployment{}
 
 	if depDef, ok := def["appsv1.Deployment"]; ok {
 		b, err := json.Marshal(depDef)
 		if err != nil {
-			s.Logger(ctx).Error("failed to marshal the deployment config to bytes", zap.Error(err))
 			return nil, err
 		}
 		var deploymentConfig = &appsv1.Deployment{}
 		if err := json.Unmarshal(b, &deploymentConfig); err != nil {
-			s.Logger(ctx).Error("failed to unmarshal the deployment config", zap.Error(err))
 			return nil, err
 		}
 		deployment = deploymentConfig
@@ -255,7 +233,7 @@ func (s *Scheduler) defaultReplicaValue(ctx context.Context, serviceValue *int32
 	const fallBackReplicaValue = 2
 
 	if definitionValue == nil && serviceValue == nil {
-		s.Logger(ctx).Warn("replica values nil using fallback of 2", zap.Int32("replica", fallBackReplicaValue))
+		s.Logger(ctx).Warn("replica values nil using fallback", zap.Int32("replica", fallBackReplicaValue))
 		return int32Ptr(fallBackReplicaValue)
 	}
 
@@ -309,7 +287,7 @@ func (s *Scheduler) defaultServiceAccountName(ctx context.Context, serviceValue 
 	return serviceValue
 }
 
-// TODO: Use Def Spec with sane default
+// TODO: Use Definition Spec with sane default
 func (s *Scheduler) defaultTermGracePeriod(ctx context.Context, definitionValue *int64) *int64 {
 	if definitionValue == nil {
 		s.Logger(ctx).Debug("termination grace period not set using default 300 seconds")
@@ -333,7 +311,7 @@ func (s *Scheduler) defaultNodeSelector(ctx context.Context, definitionValue map
 	return map[string]string{"node-group": "shared"}
 }
 
-func (s *Scheduler) defaultContainers(ctx context.Context, service *eve.DeployService, plan *eve.NSDeploymentPlan, definitionContainers []apiv1.Container) []apiv1.Container {
+func (s *Scheduler) defaultContainers(service *eve.DeployService, plan *eve.NSDeploymentPlan, definitionContainers []apiv1.Container) []apiv1.Container {
 	defaultContainer := apiv1.Container{
 		Name:            service.ArtifactName,
 		ImagePullPolicy: apiv1.PullAlways,
@@ -395,9 +373,31 @@ func (s *Scheduler) defaultContainerResources(ctx context.Context, serviceValue 
 	return apiv1.ResourceRequirements{}
 }
 
+func persistentVolumeClaim(plan *eve.NSDeploymentPlan, service *eve.DeployService) {
+	_ = apiv1.PersistentVolumeClaim{
+		TypeMeta: metav1.TypeMeta{Kind: "PersistentVolumeClaim", APIVersion: "v1"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      service.ServiceName,
+			Namespace: plan.Namespace.Name,
+		},
+		Spec: apiv1.PersistentVolumeClaimSpec{
+			AccessModes: []apiv1.PersistentVolumeAccessMode{apiv1.ReadWriteOnce},
+			Resources: apiv1.ResourceRequirements{
+				Requests: apiv1.ResourceList{},
+			},
+		},
+	}
+}
+
 func (s *Scheduler) hydrateK8sDeployment(ctx context.Context, plan *eve.NSDeploymentPlan, service *eve.DeployService, nuance string) (*appsv1.Deployment, error) {
 
-	newDeployment, err := s.deploymentDefinition(ctx, service.Definition)
+	definitionSpec, err := s.parseDefinitionSpec(service.Definition)
+	if err != nil {
+		s.Logger(ctx).Error("failed to parse definition bytes", zap.Error(err))
+		return nil, err
+	}
+
+	newDeployment, err := s.deploymentDefinition(definitionSpec)
 	if err != nil {
 		s.Logger(ctx).Error("failed to generate deployment definition", zap.Error(err))
 		return nil, err
@@ -415,11 +415,12 @@ func (s *Scheduler) hydrateK8sDeployment(ctx context.Context, plan *eve.NSDeploy
 	newDeployment.Spec.Template.Spec.ServiceAccountName = s.defaultServiceAccountName(ctx, service.ServiceAccount, newDeployment.Spec.Template.Spec.ServiceAccountName)
 	newDeployment.Spec.Template.Spec.TerminationGracePeriodSeconds = s.defaultTermGracePeriod(ctx, newDeployment.Spec.Template.Spec.TerminationGracePeriodSeconds)
 	newDeployment.Spec.Template.Spec.NodeSelector = s.defaultNodeSelector(ctx, newDeployment.Spec.Template.Spec.NodeSelector)
-	newDeployment.Spec.Template.Spec.Containers = s.defaultContainers(ctx, service, plan, newDeployment.Spec.Template.Spec.Containers)
+	newDeployment.Spec.Template.Spec.Containers = s.defaultContainers(service, plan, newDeployment.Spec.Template.Spec.Containers)
 	newDeployment.Spec.Template.Spec.Containers[0].ReadinessProbe = s.defaultProbe(ctx, service.ReadinessProbe, newDeployment.Spec.Template.Spec.Containers[0].ReadinessProbe)
 	newDeployment.Spec.Template.Spec.Containers[0].LivenessProbe = s.defaultProbe(ctx, service.LivelinessProbe, newDeployment.Spec.Template.Spec.Containers[0].LivenessProbe)
 	newDeployment.Spec.Template.Spec.Containers[0].Resources = s.defaultContainerResources(ctx, service.PodResource, newDeployment.Spec.Template.Spec.Containers[0].Resources)
 
+	//newDeployment.Spec.Template.Spec.Volumes[0].
 	s.Logger(ctx).Info("k8s deployment spec", zap.Any("deployment", newDeployment))
 
 	return newDeployment, nil

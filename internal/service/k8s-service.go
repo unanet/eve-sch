@@ -13,12 +13,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-var (
-	serviceMetaData = metav1.TypeMeta{
-		Kind:       "Service",
-		APIVersion: "apps/v1",
-	}
-)
+var serviceMetaData = metav1.TypeMeta{Kind: "Service", APIVersion: "apps/v1"}
 
 func hydrateK8sService(ctx context.Context, plan *eve.NSDeploymentPlan, service *eve.DeployService) *apiv1.Service {
 	svc := &apiv1.Service{

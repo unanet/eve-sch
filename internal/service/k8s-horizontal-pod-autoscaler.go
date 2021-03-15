@@ -4,12 +4,11 @@ import (
 	"context"
 	"encoding/json"
 
-	apiv1 "k8s.io/api/core/v1"
-
 	"github.com/pkg/errors"
 	"gitlab.unanet.io/devops/eve/pkg/eve"
 	"go.uber.org/zap"
 	autoscaling "k8s.io/api/autoscaling/v2beta2"
+	apiv1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	apimachinerymetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -127,14 +126,8 @@ func (as *AutoScaleSettings) UtilizationMetricSpecs() []autoscaling.MetricSpec {
 	return result
 }
 
-var (
-	hpaMetaData = metav1.TypeMeta{
-		Kind:       "HorizontalPodAutoscaler",
-		APIVersion: "autoscaling/v2beta2",
-	}
-)
+var hpaMetaData = metav1.TypeMeta{Kind: "HorizontalPodAutoscaler", APIVersion: "autoscaling/v2beta2"}
 
-// { "enabled": true, "utilization": { "cpu": 80, "memory": 100 }, "replicas": { "min": 2, "max": 10 } }
 func (s *Scheduler) parseAutoScale(ctx context.Context, input []byte) (*AutoScaleSettings, error) {
 	if input == nil || len(input) < 2 {
 		s.Logger(ctx).Warn("invalid pod autoscale input", zap.ByteString("pod_autoscale", input))

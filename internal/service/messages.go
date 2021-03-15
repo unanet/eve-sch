@@ -36,9 +36,6 @@ func (s *Scheduler) deployNamespace(ctx context.Context, m *queue.M) error {
 		if x.ArtifactoryFeedType == eve.ArtifactoryFeedTypeDocker {
 			s.deployDockerService(ctx, x, plan)
 		}
-		if len(x.ArtifactFnPtr) > 0 {
-			s.triggerFunction(ctx, x.ServiceName, x.DeployArtifact, plan)
-		}
 	}
 
 	for _, x := range plan.Jobs {
@@ -49,9 +46,6 @@ func (s *Scheduler) deployNamespace(ctx context.Context, m *queue.M) error {
 
 		if x.ArtifactoryFeedType == eve.ArtifactoryFeedTypeDocker {
 			s.runDockerJob(ctx, x, plan)
-		}
-		if len(x.ArtifactFnPtr) > 0 {
-			s.triggerFunction(ctx, x.JobName, x.DeployArtifact, plan)
 		}
 	}
 

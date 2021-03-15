@@ -17,7 +17,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
-	"gitlab.unanet.io/devops/eve-sch/internal/fn"
 	"gitlab.unanet.io/devops/eve-sch/internal/vault"
 )
 
@@ -34,10 +33,6 @@ type SecretsClient interface {
 	GetKVSecrets(ctx context.Context, path string) (vault.Secrets, error)
 }
 
-type FunctionTrigger interface {
-	Post(ctx context.Context, url string, code string, body interface{}) (*fn.Response, error)
-}
-
 type Scheduler struct {
 	worker     QueueWorker
 	downloader eve.CloudDownloader
@@ -46,10 +41,9 @@ type Scheduler struct {
 	done       chan bool
 	apiQUrl    string
 	vault      SecretsClient
-	fnTrigger  FunctionTrigger
 }
 
-func NewScheduler(worker QueueWorker, downloader eve.CloudDownloader, uploader eve.CloudUploader, apiQUrl string, vault SecretsClient, fnTrigger FunctionTrigger) *Scheduler {
+func NewScheduler(worker QueueWorker, downloader eve.CloudDownloader, uploader eve.CloudUploader, apiQUrl string, vault SecretsClient) *Scheduler {
 	return &Scheduler{
 		worker:     worker,
 		downloader: downloader,
@@ -58,7 +52,6 @@ func NewScheduler(worker QueueWorker, downloader eve.CloudDownloader, uploader e
 		sigChannel: make(chan os.Signal, 1024),
 		apiQUrl:    apiQUrl,
 		vault:      vault,
-		fnTrigger:  fnTrigger,
 	}
 }
 
