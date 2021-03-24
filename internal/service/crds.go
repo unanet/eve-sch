@@ -120,11 +120,15 @@ func (s *Scheduler) setDeploymentDefinitions(
 func (s *Scheduler) setServiceDefinitions(definition *unstructured.Unstructured, eveDeployment eve.DeploymentSpec) error {
 
 	if err := defaultServicePort(definition, eveDeployment); err != nil {
-		return errors.Wrap(err, "failed to override image pull secrets")
+		return errors.Wrap(err, "failed to set default service port")
 	}
 
 	if err := unstructured.SetNestedField(definition.Object, eveDeployment.GetName(), definitionSpecKeyMap["selectorApp"]...); err != nil {
 		return errors.Wrap(err, "failed to set selectorApp on k8s CRD")
+	}
+
+	if err := defaultStickySessions(definition, eveDeployment); err != nil {
+		return errors.Wrap(err, "failed to set the default sticky sessions")
 	}
 
 	return nil
