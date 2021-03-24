@@ -3,6 +3,8 @@ package service
 import (
 	"encoding/json"
 
+	apiv1 "k8s.io/api/core/v1"
+
 	"github.com/pkg/errors"
 	"gitlab.unanet.io/devops/eve/pkg/eve"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -14,6 +16,7 @@ var definitionSpecKeyMap = map[string][]string{
 	"metadataAnnotations":           {"metadata", "annotations"},
 	"metadataLabels":                {"metadata", "labels"},
 	"replicas":                      {"spec", "replicas"},
+	"sessionAffinity":               {"spec", "sessionAffinity"},
 	"selectorApp":                   {"spec", "selector", "app"},
 	"matchLabelsApp":                {"spec", "selector", "matchLabels", "app"},
 	"templateMetaLabels":            {"spec", "template", "metadata", "labels"},
@@ -30,6 +33,27 @@ var definitionSpecKeyMap = map[string][]string{
 	"imagePullSecrets":              {"spec", "template", "spec", "imagePullSecrets"},
 	"containers":                    {"spec", "template", "spec", "containers"},
 	"restartPolicy":                 {"spec", "template", "spec", "restartPolicy"},
+}
+
+func defaultStickySessions(definition *unstructured.Unstructured, deployment eve.DeploymentSpec) error {
+	if deployment.GetStickySessions() {
+		_, found, err := unstructured.NestedString(definition.Object, definitionSpecKeyMap["sessionAffinity"]...)
+		if err != nil {
+			return errors.Wrap(err, "failed to find spec.sessionAffinity on k8s service CRD")
+		}
+
+		// sessionAffinity declared on the definition; use it
+		if found {
+			return nil
+		}
+
+		// Nothing declared, but for legacy reason (deployment.GetStickySessions()) we need to set it
+		if err := unstructured.SetNestedField(definition.Object, string(apiv1.ServiceAffinityClientIP), definitionSpecKeyMap["sessionAffinity"]...); err != nil {
+			return errors.Wrap(err, "failed to set spec.sessionAffinity on k8s service CRD")
+		}
+	}
+
+	return nil
 }
 
 func defaultPodResources(serviceValue []byte, definitionValue map[string]interface{}) map[string]interface{} {
