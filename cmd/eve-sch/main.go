@@ -10,15 +10,17 @@ import (
 	"gitlab.unanet.io/devops/eve-sch/internal/vault"
 	"gitlab.unanet.io/devops/eve/pkg/queue"
 	"gitlab.unanet.io/devops/eve/pkg/s3"
+	"gitlab.unanet.io/devops/go/pkg/errors"
 	"gitlab.unanet.io/devops/go/pkg/log"
 	"go.uber.org/zap"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 func main() {
 	c := config.GetConfig()
-	awsSession, err := session.NewSession(&aws.Config{
-		Region: aws.String(c.AWSRegion),
-	})
+	awsSession, err := session.NewSession(&aws.Config{Region: aws.String(c.AWSRegion)})
 	if err != nil {
 		log.Logger.Panic("failed to create aws session", zap.Error(err))
 	}
@@ -26,6 +28,17 @@ func main() {
 	vaultClient, err := vault.NewClient()
 	if err != nil {
 		log.Logger.Panic("failed to create the vault secrets client")
+	}
+
+	k8sDynamicClient, err := getDynamicK8sClient()
+	if err != nil {
+		log.Logger.Panic("failed to create the k8s client")
+	}
+
+	// TODO: remove once everything is using dynamic client
+	k8sClient, err := getK8sClient()
+	if err != nil {
+		log.Logger.Panic("failed to create the k8s client")
 	}
 
 	schQueue := queue.NewQ(awsSession, queue.Config{
@@ -40,12 +53,11 @@ func main() {
 	})
 
 	s3Downloader := s3.NewDownloader(awsSession)
-
 	worker := queue.NewWorker("eve-sch", schQueue, c.SchQWorkerTimeout)
-	scheduler := service.NewScheduler(worker, s3Downloader, s3Uploader, c.ApiQUrl, vaultClient)
+	scheduler := service.NewScheduler(worker, s3Downloader, s3Uploader, c.ApiQUrl, vaultClient, k8sDynamicClient, k8sClient)
 	scheduler.Start()
-
 	callbackManager := callback.NewManager(worker, c.ApiQUrl)
+
 	controllers, err := api.InitializeControllers(callbackManager)
 	if err != nil {
 		log.Logger.Panic("Unable to Initialize the Controllers")
@@ -57,4 +69,33 @@ func main() {
 	}
 
 	apiServer.Start(scheduler.Stop)
+}
+
+func getDynamicK8sClient() (dynamic.Interface, error) {
+
+	c, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, errors.Wrap(err)
+	}
+
+	client, err := dynamic.NewForConfig(c)
+	if err != nil {
+		return nil, errors.Wrap(err)
+	}
+
+	return client, nil
+}
+
+func getK8sClient() (*kubernetes.Clientset, error) {
+	c, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, errors.Wrap(err)
+	}
+
+	client, err := kubernetes.NewForConfig(c)
+	if err != nil {
+		return nil, errors.Wrap(err)
+	}
+
+	return client, nil
 }

@@ -24,7 +24,7 @@ func replace(input, from, to string) string {
 	return strings.Replace(input, from, to, -1)
 }
 
-func ParseServiceMetadata(metadata map[string]interface{}, service *eve.DeployService, plan *eve.NSDeploymentPlan) (map[string]interface{}, error) {
+func parseServiceMetadata(metadata map[string]interface{}, service *eve.DeployService, plan *eve.NSDeploymentPlan) (map[string]interface{}, error) {
 	metadataJson, err := json.Marshal(metadata)
 	if err != nil {
 		return map[string]interface{}{}, err
@@ -66,7 +66,7 @@ func overrideMetaData(m map[string]interface{}, overrides eve.MetadataField) map
 	return m
 }
 
-func ParseJobMetadata(metadata map[string]interface{}, job *eve.DeployJob, plan *eve.NSDeploymentPlan) (map[string]interface{}, error) {
+func parseJobMetadata(metadata map[string]interface{}, job *eve.DeployJob, plan *eve.NSDeploymentPlan) (map[string]interface{}, error) {
 	metadataJson, err := json.Marshal(metadata)
 	if err != nil {
 		return nil, err

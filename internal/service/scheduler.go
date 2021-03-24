@@ -5,19 +5,21 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"strconv"
-	"strings"
 	"syscall"
 
+	"gitlab.unanet.io/devops/eve-sch/internal/vault"
 	"gitlab.unanet.io/devops/eve/pkg/eve"
 	"gitlab.unanet.io/devops/eve/pkg/queue"
 	"gitlab.unanet.io/devops/go/pkg/errors"
 	"gitlab.unanet.io/devops/go/pkg/log"
 	"go.uber.org/zap"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
+)
 
-	"gitlab.unanet.io/devops/eve-sch/internal/vault"
+const (
+	CommandUpdateDeployment string = "api-update-deployment"
+	CommandCallbackMessage  string = "api-callback-message"
 )
 
 type QueueWorker interface {
@@ -34,25 +36,42 @@ type SecretsClient interface {
 }
 
 type Scheduler struct {
-	worker     QueueWorker
-	downloader eve.CloudDownloader
-	uploader   eve.CloudUploader
-	sigChannel chan os.Signal
-	done       chan bool
-	apiQUrl    string
-	vault      SecretsClient
+	worker           QueueWorker
+	downloader       eve.CloudDownloader
+	uploader         eve.CloudUploader
+	sigChannel       chan os.Signal
+	done             chan bool
+	apiQUrl          string
+	vault            SecretsClient
+	k8sDynamicClient dynamic.Interface
+	k8sClient        *kubernetes.Clientset
 }
 
-func NewScheduler(worker QueueWorker, downloader eve.CloudDownloader, uploader eve.CloudUploader, apiQUrl string, vault SecretsClient) *Scheduler {
+func NewScheduler(
+	worker QueueWorker,
+	downloader eve.CloudDownloader,
+	uploader eve.CloudUploader,
+	apiQUrl string,
+	vault SecretsClient,
+	k8sDynamic dynamic.Interface,
+	k8sClient *kubernetes.Clientset,
+) *Scheduler {
 	return &Scheduler{
-		worker:     worker,
-		downloader: downloader,
-		uploader:   uploader,
-		done:       make(chan bool),
-		sigChannel: make(chan os.Signal, 1024),
-		apiQUrl:    apiQUrl,
-		vault:      vault,
+		worker:           worker,
+		downloader:       downloader,
+		uploader:         uploader,
+		done:             make(chan bool),
+		sigChannel:       make(chan os.Signal, 1024),
+		apiQUrl:          apiQUrl,
+		vault:            vault,
+		k8sDynamicClient: k8sDynamic,
+		k8sClient:        k8sClient,
 	}
+}
+
+func (s *Scheduler) Stop() {
+	s.worker.Stop()
+	close(s.done)
 }
 
 func (s *Scheduler) Logger(ctx context.Context) *zap.Logger {
@@ -70,9 +89,79 @@ func (s *Scheduler) start() {
 	log.Logger.Info("Service Shutdown")
 }
 
-func (s *Scheduler) Stop() {
-	s.worker.Stop()
-	close(s.done)
+func (s *Scheduler) handleMessage(ctx context.Context, m *queue.M) error {
+	switch m.Command {
+	case queue.CommandDeployNamespace, queue.CommandRestartNamespace:
+		return s.deployNamespace(ctx, m)
+	default:
+		return errors.Wrapf("unrecognized command: %s", m.Command)
+	}
+}
+
+func (s *Scheduler) deployNamespace(ctx context.Context, m *queue.M) error {
+	plan, err := eve.UnMarshalNSDeploymentFromS3LocationBody(ctx, s.downloader, m.Body)
+	if err != nil {
+		return errors.Wrap(err)
+	}
+
+	for _, x := range plan.Services {
+		x.Metadata, err = parseServiceMetadata(x.Metadata, x, plan)
+		if err != nil {
+			plan.Message("could not parse metadata, service: %s, error: %s", x.ArtifactName, err)
+		}
+		x.Definition, err = parseServiceDefinition(x.Definition, x, plan)
+		if err != nil {
+			plan.Message("could not parse definition, service: %s, error: %s", x.ArtifactName, err)
+		}
+
+		if x.ArtifactoryFeedType == eve.ArtifactoryFeedTypeDocker {
+			s.deploy(ctx, x, plan)
+		}
+	}
+
+	for _, x := range plan.Jobs {
+		x.Metadata, err = parseJobMetadata(x.Metadata, x, plan)
+		if err != nil {
+			plan.Message("could not parse metadata, job: %s, error: %s", x.ArtifactName, err)
+		}
+
+		x.Definition, err = parseJobDefinition(x.Definition, x, plan)
+		if err != nil {
+			plan.Message("could not parse definition, job: %s, error: %s", x.ArtifactName, err)
+		}
+
+		if x.ArtifactoryFeedType == eve.ArtifactoryFeedTypeDocker {
+			s.deploy(ctx, x, plan)
+		}
+	}
+
+	err = s.worker.DeleteMessage(ctx, m)
+	if err != nil {
+		return errors.Wrap(err)
+	}
+
+	if plan.Failed() {
+		plan.Status = eve.DeploymentPlanStatusErrors
+	} else {
+		plan.Status = eve.DeploymentPlanStatusComplete
+	}
+
+	mBody, err := eve.MarshalNSDeploymentPlanToS3LocationBody(ctx, s.uploader, plan)
+	if err != nil {
+		return errors.Wrap(err)
+	}
+
+	err = s.worker.Message(ctx, s.apiQUrl, &queue.M{
+		ID:      m.ID,
+		GroupID: CommandUpdateDeployment,
+		Body:    mBody,
+		Command: CommandUpdateDeployment,
+	})
+	if err != nil {
+		return errors.Wrap(err)
+	}
+
+	return nil
 }
 
 func (s *Scheduler) logMessageFn(optName string, service *eve.DeployArtifact, plan *eve.NSDeploymentPlan) func(format string, a ...interface{}) {
@@ -101,80 +190,4 @@ func (s *Scheduler) failAndLogFn(ctx context.Context, optName string, service *e
 			s.Logger(ctx).Warn(fmt.Sprintf(format, a...), zap.String("artifact", service.ArtifactName), zap.String("deploy_name", optName))
 		}
 	}
-}
-
-func intContains(s []int, e int) bool {
-	for _, a := range s {
-		if a == e {
-			return true
-		}
-	}
-	return false
-}
-
-func expandSuccessExitCodes(successExitCodes string) ([]int, error) {
-	var r []int
-	var last int
-	for _, part := range strings.Split(successExitCodes, ",") {
-		if i := strings.Index(part[1:], "-"); i == -1 {
-			n, err := strconv.Atoi(part)
-			if err != nil {
-				return nil, fmt.Errorf("success_exit_code parse error, parts are not a valid int: %s", err.Error())
-			}
-			if len(r) > 0 {
-				if last == n {
-
-					return nil, fmt.Errorf("success_exit_code parse error, duplicate value: %d", n)
-				} else if last > n {
-					return nil, fmt.Errorf("success_exit_code parse error, values not ordered: %d", n)
-				}
-			}
-			r = append(r, n)
-			last = n
-		} else {
-			n1, err := strconv.Atoi(part[:i+1])
-			if err != nil {
-				return nil, fmt.Errorf("success_exit_code parse error, parts are not a valid int: %s", err.Error())
-			}
-			n2, err := strconv.Atoi(part[i+2:])
-			if err != nil {
-				return nil, fmt.Errorf("success_exit_code parse error, parts are not a valid int: %s", err.Error())
-			}
-			if n2 < n1+2 {
-				return nil, fmt.Errorf("success_exit_code parse error, invalid range: %s", part)
-			}
-			if len(r) > 0 {
-				if last == n1 {
-					return nil, fmt.Errorf("success_exit_code parse error, duplicate value: %d", n1)
-				} else if last > n1 {
-					return nil, fmt.Errorf("success_exit_code parse error, values not ordered: %d", n1)
-				}
-			}
-			for i = n1; i <= n2; i++ {
-				r = append(r, i)
-			}
-			last = n2
-		}
-	}
-
-	return r, nil
-}
-
-func getK8sClient() (*kubernetes.Clientset, error) {
-	c, err := rest.InClusterConfig()
-	if err != nil {
-		return nil, errors.Wrap(err)
-	}
-
-	client, err := kubernetes.NewForConfig(c)
-	if err != nil {
-		return nil, errors.Wrap(err)
-	}
-
-	return client, nil
-}
-
-func getDockerImageName(artifact *eve.DeployArtifact) string {
-	repo := fmt.Sprintf(DockerRepoFormat, artifact.ArtifactoryFeed)
-	return fmt.Sprintf("%s/%s:%s", repo, artifact.ArtifactoryPath, artifact.EvalImageTag())
 }
