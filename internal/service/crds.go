@@ -35,7 +35,6 @@ func (s *Scheduler) deployServiceCRD(ctx context.Context, deployment eve.Deploym
 	count := 0
 	for _, crd := range mainCRDs {
 		definition := &unstructured.Unstructured{Object: crd.Data}
-
 		err := s.baseDefinition(ctx, definition, crd, plan, deployment)
 		if err != nil {
 			return errors.Wrap(err, "an error occurred trying to setup the k8s main base crd")
@@ -201,11 +200,8 @@ func (s *Scheduler) deployJobCRD(ctx context.Context, deployment eve.DeploymentS
 func (s *Scheduler) deployHorizontalPodAutoscalerCRD(ctx context.Context, deployment eve.DeploymentSpec, plan *eve.NSDeploymentPlan, crd eve.DefinitionResult) error {
 
 	definition := &unstructured.Unstructured{Object: crd.Data}
-
-	s.Logger(ctx).Debug("deployHorizontalPodAutoscalerCRD", zap.Any("definition", definition))
-
 	if err := s.baseDefinition(ctx, definition, crd, plan, deployment); err != nil {
-		return errors.Wrap(err, "failed to apply base definition pre CRD")
+		return errors.Wrap(err, "failed to apply base definition pre HPA CRD")
 	}
 
 	// TODO: Need a cleaner way to associate Resources
@@ -329,20 +325,19 @@ func (s *Scheduler) deployCRDs(ctx context.Context, deployment eve.DeploymentSpe
 		if strings.ToLower(crd.Kind) == "horizontalpodautoscaler" {
 			s.Logger(ctx).Debug("deploying autoscale crd definition", zap.Any("crd", crd))
 			if err := s.deployHorizontalPodAutoscalerCRD(ctx, deployment, plan, crd); err != nil {
-				return errors.Wrap(err, "failed to deploy job CRD")
+				return errors.Wrap(err, "failed to deploy HPA CRD")
 			}
 			hpaCount++
 			continue
 		}
 
-		s.Logger(ctx).Debug("deploying post crd definition", zap.Any("crd", crd))
 		definition := &unstructured.Unstructured{Object: crd.Data}
 		err := s.baseDefinition(ctx, definition, crd, plan, deployment)
 		if err != nil {
-			return errors.Wrap(err, "failed to apply base definition pre CRD")
+			return errors.Wrap(err, "failed to apply base definition post CRD")
 		}
 		if err := s.saveGenericCRD(ctx, definition, crd, plan, deployment); err != nil {
-			return errors.Wrap(err, "failed to deploy pre CRD")
+			return errors.Wrap(err, "failed to deploy post CRD")
 		}
 	}
 

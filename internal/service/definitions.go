@@ -63,6 +63,8 @@ func (s *Scheduler) baseDefinition(
 	eveDeployment eve.DeploymentSpec,
 ) error {
 
+	s.Logger(ctx).Debug("incoming k8s base CRD def", zap.Any("crd", crd), zap.Any("definition", definition))
+
 	if err := unstructured.SetNestedField(definition.Object, crd.APIVersion(), "apiVersion"); err != nil {
 		return errors.Wrap(err, "failed to set apiVersion on k8s CRD")
 	}
