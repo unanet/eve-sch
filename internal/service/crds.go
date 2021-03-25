@@ -22,6 +22,10 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+func groupSchemaResourceVersion(crdDef eve.DefinitionResult) schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: crdDef.Class, Version: crdDef.Version, Resource: crdDef.Resource()}
+}
+
 func (s *Scheduler) deployServiceCRD(ctx context.Context, deployment eve.DeploymentSpec, plan *eve.NSDeploymentPlan, definitions eve.DefinitionResults) error {
 	mainCRDs := definitions.CRDs("main")
 	// This means the definitions aren't defined in Eve (api/DB)

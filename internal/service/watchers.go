@@ -15,6 +15,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+func deploymentLabelSelector(eveDeployment eve.DeploymentSpec) string {
+	return fmt.Sprintf("app=%s,version=%s,nuance=%s", eveDeployment.GetName(), eveDeployment.GetArtifact().AvailableVersion, eveDeployment.GetNuance())
+}
+
+func jobLabelSelector(eveDeployment eve.DeploymentSpec) string {
+	return fmt.Sprintf("job=%s", eveDeployment.GetName())
+}
+
 func (s *Scheduler) getWatcher(ctx context.Context, eveDeployment eve.DeploymentSpec, nameSpace string) (watch.Interface, error) {
 	var labelSelector string
 	var timeout int64

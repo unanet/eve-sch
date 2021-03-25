@@ -63,9 +63,6 @@ func (s *Scheduler) baseDefinition(
 	eveDeployment eve.DeploymentSpec,
 ) error {
 
-	crdLabels, lblKeys := crd.Labels(eveDeployment)
-	crdAnnotations, annoKeys := crd.Annotations(eveDeployment)
-
 	if err := unstructured.SetNestedField(definition.Object, crd.APIVersion(), "apiVersion"); err != nil {
 		return errors.Wrap(err, "failed to set apiVersion on k8s CRD")
 	}
@@ -82,11 +79,17 @@ func (s *Scheduler) baseDefinition(
 		return errors.Wrap(err, "failed to set metadata.namespace on k8s CRD")
 	}
 
-	if err := overrideMaps(definition, lblKeys, crdLabels); err != nil {
+	crdLabels, lblKeys := crd.Labels(eveDeployment)
+	crdAnnotations, annoKeys := crd.Annotations(eveDeployment)
+
+	s.Logger(ctx).Debug("crd labels", zap.Any("labels", crdLabels), zap.Strings("keys", lblKeys))
+	s.Logger(ctx).Debug("crd annotations", zap.Any("annotations", crdAnnotations), zap.Strings("keys", annoKeys))
+
+	if err := s.overrideMaps(ctx, definition, lblKeys, crdLabels); err != nil {
 		return errors.Wrap(err, "failed to override labels")
 	}
 
-	if err := overrideMaps(definition, annoKeys, crdAnnotations); err != nil {
+	if err := s.overrideMaps(ctx, definition, annoKeys, crdAnnotations); err != nil {
 		return errors.Wrap(err, "failed to override annotations")
 	}
 
