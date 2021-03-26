@@ -55,6 +55,70 @@ func parseServiceDefinition(definition []byte, service *eve.DeployService, plan 
 	return b.Bytes(), nil
 }
 
+// Merge Legacy Values with Standard/Common Values and any values passed in the Definition
+// this is here to support the legacy labels and annotations.
+// TODO: Remove this after we are migrated
+func (s *Scheduler) mergeLegacyDefinitionStandardMaps(ctx context.Context, legacy, defs, standard map[string]interface{}) map[string]interface{} {
+	s.Logger(ctx).Debug("crd maps",
+		zap.Any("defs", defs),
+		zap.Any("legacy", legacy),
+		zap.Any("standard", standard),
+	)
+	var result = make(map[string]interface{})
+	if defs != nil && len(defs) > 0 {
+		if legacy != nil {
+			for k, v := range legacy {
+				result[k] = v
+			}
+		}
+
+		for k, v := range defs {
+			result[k] = v
+		}
+	}
+
+	// Apply the Standard Labels last
+	for k, v := range standard {
+		result[k] = v
+	}
+
+	return result
+}
+
+func (s *Scheduler) baseAnnotations(ctx context.Context, definition *unstructured.Unstructured, crd eve.DefinitionResult, deployment eve.DeploymentSpec) error {
+	definitionAnnotations, found, err := unstructured.NestedMap(definition.Object, crd.AnnotationKeys()...)
+	if err != nil {
+		return errors.Wrapf(err, "failed to find the map by key: %v", crd.AnnotationKeys())
+	}
+	if !found || definitionAnnotations == nil {
+		definitionAnnotations = make(map[string]interface{})
+	}
+	mergedAnnotations := s.mergeLegacyDefinitionStandardMaps(ctx, deployment.GetAnnotations(), definitionAnnotations, crd.StandardAnnotations(deployment))
+
+	if err := unstructured.SetNestedMap(definition.Object, mergedAnnotations, crd.AnnotationKeys()...); err != nil {
+		return errors.Wrap(err, "failed to set CRD Labels")
+	}
+	return nil
+}
+
+func (s *Scheduler) baseLabels(ctx context.Context, definition *unstructured.Unstructured, crd eve.DefinitionResult, deployment eve.DeploymentSpec) error {
+
+	definitionLabels, found, err := unstructured.NestedMap(definition.Object, crd.LabelKeys()...)
+	if err != nil {
+		return errors.Wrapf(err, "failed to find the map by key: %v", crd.LabelKeys())
+	}
+	if !found || definitionLabels == nil {
+		definitionLabels = make(map[string]interface{})
+	}
+
+	mergedLabels := s.mergeLegacyDefinitionStandardMaps(ctx, deployment.GetLabels(), definitionLabels, crd.StandardLabels(deployment))
+
+	if err := unstructured.SetNestedMap(definition.Object, mergedLabels, crd.LabelKeys()...); err != nil {
+		return errors.Wrap(err, "failed to set CRD Labels")
+	}
+	return nil
+}
+
 func (s *Scheduler) baseDefinition(
 	ctx context.Context,
 	definition *unstructured.Unstructured,
@@ -81,18 +145,12 @@ func (s *Scheduler) baseDefinition(
 		return errors.Wrap(err, "failed to set metadata.namespace on k8s CRD")
 	}
 
-	crdLabels, lblKeys := crd.Labels(eveDeployment)
-	crdAnnotations, annoKeys := crd.Annotations(eveDeployment)
-
-	s.Logger(ctx).Debug("crd labels", zap.Any("labels", crdLabels), zap.Strings("keys", lblKeys))
-	s.Logger(ctx).Debug("crd annotations", zap.Any("annotations", crdAnnotations), zap.Strings("keys", annoKeys))
-
-	if err := s.overrideMaps(ctx, definition, lblKeys, crdLabels); err != nil {
+	if err := s.baseLabels(ctx, definition, crd, eveDeployment); err != nil {
 		return errors.Wrap(err, "failed to override labels")
 	}
 
-	if err := s.overrideMaps(ctx, definition, annoKeys, crdAnnotations); err != nil {
-		return errors.Wrap(err, "failed to override annotations")
+	if err := s.baseAnnotations(ctx, definition, crd, eveDeployment); err != nil {
+		return errors.Wrap(err, "failed to override labels")
 	}
 
 	s.Logger(ctx).Debug("k8s base CRD set up", zap.Any("crd", crd), zap.Any("definition", definition))
