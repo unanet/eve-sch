@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/hashicorp/go-multierror"
@@ -9,25 +8,9 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"gitlab.unanet.io/devops/eve-sch/internal/config"
 	"gitlab.unanet.io/devops/eve/pkg/eve"
-	"go.uber.org/zap"
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
-
-func mergeM(standard map[string]interface{}, definition map[string]interface{}) map[string]interface{} {
-	var merged = make(map[string]interface{})
-	if definition != nil {
-		for k, v := range definition {
-			merged[k] = v
-		}
-	}
-
-	for k, v := range standard {
-		merged[k] = v
-	}
-
-	return merged
-}
 
 func getDeploymentContainerPorts(eveDeployment eve.DeploymentSpec) []interface{} {
 	var result = make([]interface{}, 0)
@@ -142,27 +125,4 @@ func overrideContainers(definition *unstructured.Unstructured, eveDeployment eve
 	}
 
 	return defContainerErrs
-}
-
-func (s *Scheduler) overrideMaps(ctx context.Context, definition *unstructured.Unstructured, keyFields []string, baseLabels map[string]interface{}) error {
-
-	s.Logger(ctx).Debug("override maps", zap.Strings("keys", keyFields), zap.Any("base", baseLabels))
-
-	defLabels, found, err := unstructured.NestedMap(definition.Object, keyFields...)
-	if err != nil {
-		return errors.Wrapf(err, "failed to find the map labels by key: %v", keyFields)
-	}
-	if found {
-		s.Logger(ctx).Debug("labels defined on the definition", zap.Any("defLabels", defLabels))
-	}
-	if defLabels != nil && len(defLabels) > 0 {
-		s.Logger(ctx).Debug("merging defined labels with base (legacy) labels", zap.Any("defLabels", defLabels), zap.Any("baseLabels", baseLabels))
-		baseLabels = mergeM(baseLabels, defLabels)
-	}
-
-	if err := unstructured.SetNestedMap(definition.Object, baseLabels, keyFields...); err != nil {
-		return errors.Wrap(err, "failed to set map on k8s deployment CRD")
-	}
-
-	return nil
 }
