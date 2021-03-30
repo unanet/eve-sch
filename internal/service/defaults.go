@@ -56,18 +56,6 @@ func defaultStickySessions(definition *unstructured.Unstructured, deployment eve
 	return nil
 }
 
-func defaultPodResources(serviceValue []byte, definitionValue map[string]interface{}) map[string]interface{} {
-	if definitionValue != nil {
-		return definitionValue
-	}
-
-	// TODO: remove after migration from eve service to definition
-	if podResource := parseResource(serviceValue); podResource != nil {
-		return map[string]interface{}{"limits": podResource["limit"], "requests": podResource["request"]}
-	}
-	return nil
-}
-
 // TODO: remove after migration from eve service to definition
 func defaultProbe(serviceValue []byte, definitionValue map[string]interface{}) map[string]interface{} {
 	if definitionValue != nil {
