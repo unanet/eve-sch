@@ -332,8 +332,7 @@ func (s *Scheduler) deployCRDs(ctx context.Context, deployment eve.DeploymentSpe
 		}
 
 		definition := &unstructured.Unstructured{Object: crd.Data}
-		err := s.baseDefinition(ctx, definition, crd, plan, deployment)
-		if err != nil {
+		if err := s.baseDefinition(ctx, definition, crd, plan, deployment); err != nil {
 			return errors.Wrap(err, "failed to apply base definition post CRD")
 		}
 		if err := s.saveGenericCRD(ctx, definition, crd, plan, deployment); err != nil {

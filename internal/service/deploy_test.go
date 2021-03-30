@@ -138,8 +138,6 @@ func newMockDeployService() *eve.DeployService {
 			AvailableVersion:    "0.1.0.100",
 			ServiceAccount:      "test-svc-account",
 			ImageTag:            "",
-			Labels:              make(eve.MetadataField),
-			Annotations:         make(eve.MetadataField),
 			Metadata:            make(eve.MetadataField),
 			ArtifactoryFeed:     "artifact-feed",
 			ArtifactoryPath:     "artifact-path",
@@ -159,7 +157,6 @@ func newMockDeployService() *eve.DeployService {
 		LivelinessProbe:  []byte("{\"httpGet\": {\"path\": \"/liveliness\", \"port\": 3000}, \"periodSeconds\": 30, \"initialDelaySeconds\": 10}"),
 		ReadinessProbe:   []byte("{\"httpGet\": {\"path\": \"/readiness\", \"port\": 3000}, \"periodSeconds\": 5, \"initialDelaySeconds\": 3}"),
 		Autoscaling:      []byte("{\"enabled\": true, \"replicas\": {\"max\": 4, \"min\": 2}, \"utilization\": {\"cpu\": 85, \"memory\": 110}}"),
-		PodResource:      []byte("{\"limit\": {\"cpu\": \"1000m\", \"memory\": \"250M\"}, \"request\": {\"cpu\": \"200m\", \"memory\": \"50M\"}}"),
 		SuccessExitCodes: "0",
 	}
 }
