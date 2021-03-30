@@ -213,61 +213,6 @@ func (s *Scheduler) deployHorizontalPodAutoscalerCRD(ctx context.Context, deploy
 		return errors.Wrap(err, "failed to update scaleTargetRef")
 	}
 
-	// Check the incoming def for existing minReplicas
-	metrics, found, err := unstructured.NestedSlice(definition.Object, "spec", "metrics")
-	if err != nil || !found {
-		s.Logger(ctx).Debug("deploy HPA CRD metrics nil", zap.Any("definition", definition))
-		metrics = nil
-	}
-
-	// Check the incoming def for existing minReplicas
-	minReplicas, _, err := unstructured.NestedFloat64(definition.Object, "spec", "minReplicas")
-	if err != nil {
-		s.Logger(ctx).Error("failed to find spec.minReplicas", zap.Error(err), zap.Any("definition.Object", definition.Object))
-		minReplicas = 0
-	}
-
-	// Check the incoming def for existing maxReplicas
-	maxReplicas, _, err := unstructured.NestedFloat64(definition.Object, "spec", "maxReplicas")
-	if err != nil {
-		s.Logger(ctx).Error("failed to find spec.maxReplicas", zap.Error(err), zap.Any("definition.Object", definition.Object))
-		maxReplicas = 0
-	}
-
-	// using the values in the definition
-	// disregard old settings
-	if minReplicas > 0 && maxReplicas > 0 && metrics != nil {
-		s.Logger(ctx).Debug("deploy hpa using definition values")
-		return s.saveGenericCRD(ctx, definition, crd, plan, deployment)
-	}
-
-	// TODO: remove after migration from eve service to definition
-	autoscale, err := parseAutoScale(deployment.GetAutoscale())
-	if err != nil {
-		s.Logger(ctx).Error("failed to parse the auto scale settings", zap.Error(err))
-		return err
-	}
-
-	if autoscale == nil {
-		s.Logger(ctx).Error("unknown autoscale setting and resource definition")
-		return nil
-	}
-
-	if replicas, ok := autoscale["replicas"].(map[string]interface{}); ok {
-		if err := unstructured.SetNestedField(definition.Object, replicas["min"], "spec", "minReplicas"); err != nil {
-			return errors.Wrap(err, "failed to update minReplicas")
-		}
-		if err := unstructured.SetNestedField(definition.Object, replicas["max"], "spec", "maxReplicas"); err != nil {
-			return errors.Wrap(err, "failed to update scaleTargetRef")
-		}
-	}
-
-	if err := unstructured.SetNestedSlice(definition.Object, autoscale.UtilizationMetricSpecs(), "spec", "metrics"); err != nil {
-		return errors.Wrap(err, "failed to update scaleTargetRef")
-	}
-
-	s.Logger(ctx).Warn("deploy hpa using autoscale legacy values", zap.Any("name", deployment.GetName()), zap.Any("namespace", plan.Namespace.Name))
-
 	return s.saveGenericCRD(ctx, definition, crd, plan, deployment)
 
 }
@@ -341,15 +286,6 @@ func (s *Scheduler) deployCRDs(ctx context.Context, deployment eve.DeploymentSpe
 	}
 
 	s.Logger(ctx).Debug("post crd definitions deployed", zap.Any("hpa_count", hpaCount))
-
-	// TODO: remove after migration from eve service to definition
-	// scenario: there are existing autoscale setting (legacy...) on the service
-	// but have not been migrated/transferred/setup with the Eve Definition (CRD)
-	if len(deployment.GetAutoscale()) > 2 && hpaCount == 0 {
-		s.Logger(ctx).Debug("deploying default autoscale crd", zap.Any("hpa_count", hpaCount))
-		return s.deployHorizontalPodAutoscalerCRD(ctx, deployment, plan, defaultHPADef())
-	}
-
 	return nil
 }
 
