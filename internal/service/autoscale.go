@@ -23,18 +23,6 @@ func parseAutoScale(input []byte) (AutoScaleSettings, error) {
 	return autoscale, nil
 }
 
-func parseResource(input []byte) map[string]interface{} {
-	if input == nil || len(input) < 2 || (len(input) == 2 && (string(input[0]) != "{" || string(input[1]) != "}")) {
-		return nil
-	}
-	var podResource = make(map[string]interface{})
-	if err := json.Unmarshal(input, &podResource); err != nil {
-		return nil
-	}
-
-	return podResource
-}
-
 func (as AutoScaleSettings) UtilizationMetricSpecs() []interface{} {
 	result := make([]interface{}, 0)
 

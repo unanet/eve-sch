@@ -97,7 +97,6 @@ func overrideContainers(definition *unstructured.Unstructured, eveDeployment eve
 		ctr := baseContainer
 		ctr["readinessProbe"] = defaultProbe(eveDeployment.GetReadiness(), nil)
 		ctr["livenessProbe"] = defaultProbe(eveDeployment.GetLiveness(), nil)
-		ctr["resources"] = defaultPodResources(eveDeployment.GetResources(), nil)
 		containers = []interface{}{ctr}
 	} else {
 		for k, v := range baseContainer {
@@ -111,10 +110,6 @@ func overrideContainers(definition *unstructured.Unstructured, eveDeployment eve
 		}
 
 		if err := unstructured.SetNestedField(containers[0].(map[string]interface{}), defaultProbe(eveDeployment.GetLiveness(), containers[0].(map[string]interface{}))["livenessProbe"], "livenessProbe"); err != nil {
-			defContainerErrs = multierror.Append(defContainerErrs, errors.Wrap(err, "failed to override container readinessProbe"))
-		}
-
-		if err := unstructured.SetNestedField(containers[0].(map[string]interface{}), defaultPodResources(eveDeployment.GetResources(), containers[0].(map[string]interface{}))["resources"], "resources"); err != nil {
 			defContainerErrs = multierror.Append(defContainerErrs, errors.Wrap(err, "failed to override container readinessProbe"))
 		}
 

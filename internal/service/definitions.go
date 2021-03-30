@@ -58,20 +58,13 @@ func parseServiceDefinition(definition []byte, service *eve.DeployService, plan 
 // Merge Legacy Values with Standard/Common Values and any values passed in the Definition
 // this is here to support the legacy labels and annotations.
 // TODO: Remove this after we are migrated
-func (s *Scheduler) mergeLegacyDefinitionStandardMaps(ctx context.Context, legacy, defs, standard map[string]interface{}) map[string]interface{} {
+func (s *Scheduler) mergeDefStandardMaps(ctx context.Context, defs, standard map[string]interface{}) map[string]interface{} {
 	s.Logger(ctx).Debug("crd maps",
 		zap.Any("defs", defs),
-		zap.Any("legacy", legacy),
 		zap.Any("standard", standard),
 	)
 	var result = make(map[string]interface{})
 	if defs != nil && len(defs) > 0 {
-		if legacy != nil {
-			for k, v := range legacy {
-				result[k] = v
-			}
-		}
-
 		for k, v := range defs {
 			result[k] = v
 		}
@@ -93,7 +86,7 @@ func (s *Scheduler) baseAnnotations(ctx context.Context, definition *unstructure
 	if !found || definitionAnnotations == nil {
 		definitionAnnotations = make(map[string]interface{})
 	}
-	mergedAnnotations := s.mergeLegacyDefinitionStandardMaps(ctx, deployment.GetAnnotations(), definitionAnnotations, crd.StandardAnnotations(deployment))
+	mergedAnnotations := s.mergeDefStandardMaps(ctx, definitionAnnotations, crd.StandardAnnotations(deployment))
 
 	if err := unstructured.SetNestedMap(definition.Object, mergedAnnotations, crd.AnnotationKeys()...); err != nil {
 		return errors.Wrap(err, "failed to set CRD Labels")
@@ -111,7 +104,7 @@ func (s *Scheduler) baseLabels(ctx context.Context, definition *unstructured.Uns
 		definitionLabels = make(map[string]interface{})
 	}
 
-	mergedLabels := s.mergeLegacyDefinitionStandardMaps(ctx, deployment.GetLabels(), definitionLabels, crd.StandardLabels(deployment))
+	mergedLabels := s.mergeDefStandardMaps(ctx, definitionLabels, crd.StandardLabels(deployment))
 
 	if err := unstructured.SetNestedMap(definition.Object, mergedLabels, crd.LabelKeys()...); err != nil {
 		return errors.Wrap(err, "failed to set CRD Labels")
