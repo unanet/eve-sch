@@ -156,7 +156,6 @@ func newMockDeployService() *eve.DeployService {
 		Definition:       nil,
 		LivelinessProbe:  []byte("{\"httpGet\": {\"path\": \"/liveliness\", \"port\": 3000}, \"periodSeconds\": 30, \"initialDelaySeconds\": 10}"),
 		ReadinessProbe:   []byte("{\"httpGet\": {\"path\": \"/readiness\", \"port\": 3000}, \"periodSeconds\": 5, \"initialDelaySeconds\": 3}"),
-		Autoscaling:      []byte("{\"enabled\": true, \"replicas\": {\"max\": 4, \"min\": 2}, \"utilization\": {\"cpu\": 85, \"memory\": 110}}"),
 		SuccessExitCodes: "0",
 	}
 }
