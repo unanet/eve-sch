@@ -386,20 +386,25 @@ func (s *Scheduler) saveJobCRD(
 	definition *unstructured.Unstructured,
 	crdDef eve.DefinitionResult) error {
 
+	s.Logger(ctx).Info("saving job crd", zap.String("name", eveDeployment.GetName()))
+
 	existingJobCRD, newlyCreated, err := s.resolveExistingCRD(ctx, definition, crdDef, plan, eveDeployment)
 	if err != nil {
 		return errors.Wrap(err, "failed to resolve the existing CRD")
 	}
 	if newlyCreated {
+		s.Logger(ctx).Info("newly created job", zap.String("name", eveDeployment.GetName()))
 		// The CRD didn't exists, so it was created, time to return
 		return nil
 	}
+
+	s.Logger(ctx).Info("job already exists; delete it...", zap.String("name", eveDeployment.GetName()))
 
 	if err := s.deleteCRD(ctx, plan.Namespace.Name, existingJobCRD, crdDef); err != nil {
 		return errors.Wrap(err, "failed to delete k8s CRD")
 	}
 
-	s.Logger(ctx).Info("info job deleted", zap.String("name", eveDeployment.GetName()))
+	s.Logger(ctx).Info("info job deleted...sleeping...", zap.String("name", eveDeployment.GetName()))
 
 	time.Sleep(5 * time.Second)
 
@@ -408,6 +413,7 @@ func (s *Scheduler) saveJobCRD(
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		if _, err := s.k8sDynamicClient.Resource(groupSchemaResourceVersion(crdDef)).Namespace(plan.Namespace.Name).Create(ctx, definition, metav1.CreateOptions{}); err != nil {
 			if k8sErrors.IsAlreadyExists(err) || k8sErrors.IsConflict(err) {
+				s.Logger(ctx).Warn("failed job creation", zap.String("name", eveDeployment.GetName()), zap.Error(err))
 				return nil
 			}
 			return errors.Wrap(err, "failed to create the k8s job")
@@ -417,6 +423,8 @@ func (s *Scheduler) saveJobCRD(
 	if retryErr != nil {
 		return errors.Wrap(retryErr, "failed to create k8s CRD after retry")
 	}
+
+	s.Logger(ctx).Info("job successfully deleted and recreated", zap.String("name", eveDeployment.GetName()))
 	return nil
 }
 
@@ -491,9 +499,9 @@ func (s *Scheduler) createCRD(ctx context.Context, crdResult schema.GroupVersion
 }
 
 func (s *Scheduler) deleteCRD(ctx context.Context, nameSpace string, existingCRD *unstructured.Unstructured, crdDef eve.DefinitionResult) error {
-	s.Logger(ctx).Debug("deleting  k8s crds with definition",
+	s.Logger(ctx).Info("deleting  k8s crds with definition",
 		zap.String("namespace", nameSpace),
-		zap.Any("definition", existingCRD),
+		zap.Any("existing_crd", existingCRD),
 		zap.Any("crd", crdDef),
 	)
 	dp := metav1.DeletePropagationForeground
