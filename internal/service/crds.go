@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	goerrors "errors"
 	"strings"
+	"time"
 
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -397,6 +398,12 @@ func (s *Scheduler) saveJobCRD(
 	if err := s.deleteCRD(ctx, plan.Namespace.Name, existingJobCRD, crdDef); err != nil {
 		return errors.Wrap(err, "failed to delete k8s CRD")
 	}
+
+	s.Logger(ctx).Info("info job deleted", zap.String("name", eveDeployment.GetName()))
+
+	time.Sleep(5 * time.Second)
+
+	s.Logger(ctx).Info("info creating new", zap.String("name", eveDeployment.GetName()))
 
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		if _, err := s.k8sDynamicClient.Resource(groupSchemaResourceVersion(crdDef)).Namespace(plan.Namespace.Name).Create(ctx, definition, metav1.CreateOptions{}); err != nil {
