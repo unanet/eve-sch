@@ -151,11 +151,8 @@ func newMockDeployService() *eve.DeployService {
 		ServicePort:      3000,
 		MetricsPort:      3001,
 		ServiceName:      "some-silly-service",
-		StickySessions:   false,
 		Count:            2,
 		Definition:       nil,
-		LivelinessProbe:  []byte("{\"httpGet\": {\"path\": \"/liveliness\", \"port\": 3000}, \"periodSeconds\": 30, \"initialDelaySeconds\": 10}"),
-		ReadinessProbe:   []byte("{\"httpGet\": {\"path\": \"/readiness\", \"port\": 3000}, \"periodSeconds\": 5, \"initialDelaySeconds\": 3}"),
 		SuccessExitCodes: "0",
 	}
 }

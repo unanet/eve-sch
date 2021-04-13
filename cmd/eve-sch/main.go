@@ -35,7 +35,7 @@ func main() {
 		log.Logger.Panic("failed to create the k8s client")
 	}
 
-	// TODO: remove once everything is using dynamic client
+	// TODO: remove this once someone figures out how to use the dynamic client when watching pods
 	k8sClient, err := getK8sClient()
 	if err != nil {
 		log.Logger.Panic("failed to create the k8s client")

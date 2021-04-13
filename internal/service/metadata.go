@@ -31,20 +31,14 @@ func parseServiceMetadata(metadata map[string]interface{}, service *eve.DeploySe
 	}
 
 	temp := template.New("metadata")
-	temp.Funcs(template.FuncMap{
-		"replace": replace,
-	})
+	temp.Funcs(template.FuncMap{"replace": replace})
 	temp, err = temp.Parse(string(metadataJson))
 	if err != nil {
 		return map[string]interface{}{}, err
 	}
 
 	var b bytes.Buffer
-	err = temp.Execute(&b, TemplateServiceData{
-		Plan:    plan,
-		Service: service,
-	})
-	if err != nil {
+	if err := temp.Execute(&b, TemplateServiceData{Plan: plan, Service: service}); err != nil {
 		return nil, err
 	}
 

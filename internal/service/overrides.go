@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/hashicorp/go-multierror"
@@ -58,11 +59,12 @@ func defaultContainerEnvVars(deploymentID uuid.UUID, artifact *eve.DeployArtifac
 	return containerEnvVars
 }
 
-func overrideImagePullSecrets(definition *unstructured.Unstructured) error {
+func (s *Scheduler) overrideImagePullSecrets(ctx context.Context, definition *unstructured.Unstructured) error {
 	// extract spec image pull secret
-	ips, found, err := unstructured.NestedSlice(definition.Object, definitionSpecKeyMap["imagePullSecrets"]...)
+	ips, found, err := unstructured.NestedSlice(definition.Object, "spec", "template", "spec", "imagePullSecrets")
 	if err != nil || !found || ips == nil {
-		if err := unstructured.SetNestedField(definition.Object, []interface{}{map[string]interface{}{"name": "docker-cfg"}}, definitionSpecKeyMap["imagePullSecrets"]...); err != nil {
+		s.Logger(ctx).Warn("missing definition image pull secrets")
+		if err := unstructured.SetNestedField(definition.Object, []interface{}{map[string]interface{}{"name": "docker-cfg"}}, "spec", "template", "spec", "imagePullSecrets"); err != nil {
 			return errors.Wrap(err, "failed to update imagePullSecrets")
 		}
 		return nil
@@ -71,7 +73,7 @@ func overrideImagePullSecrets(definition *unstructured.Unstructured) error {
 	if err := unstructured.SetNestedField(ips[0].(map[string]interface{}), "docker-cfg", "name"); err != nil {
 		return errors.Wrap(err, "failed to update image pull secrets with docker-cfg")
 	}
-	if err := unstructured.SetNestedField(definition.Object, ips, definitionSpecKeyMap["imagePullSecrets"]...); err != nil {
+	if err := unstructured.SetNestedField(definition.Object, ips, "spec", "template", "spec", "imagePullSecrets"); err != nil {
 		return errors.Wrap(err, "failed to update image pull secrets")
 	}
 	return nil
@@ -92,30 +94,18 @@ func overrideContainers(definition *unstructured.Unstructured, eveDeployment eve
 
 	// First try and find/extract the "containers" key in the definition
 	// if 1 (or more) are found, then use that as the Definition spec (i.e. take what was supplied from eve-api definition)
-	containers, found, err := unstructured.NestedSlice(definition.Object, definitionSpecKeyMap["containers"]...)
+	containers, found, err := unstructured.NestedSlice(definition.Object, "spec", "template", "spec", "containers")
 	if err != nil || !found || containers == nil || len(containers) == 0 {
-		ctr := baseContainer
-		ctr["readinessProbe"] = defaultProbe(eveDeployment.GetReadiness(), nil)
-		ctr["livenessProbe"] = defaultProbe(eveDeployment.GetLiveness(), nil)
-		containers = []interface{}{ctr}
+		containers = []interface{}{baseContainer}
 	} else {
 		for k, v := range baseContainer {
 			if err := unstructured.SetNestedField(containers[0].(map[string]interface{}), v, k); err != nil {
 				defContainerErrs = multierror.Append(defContainerErrs, errors.Wrap(err, "failed to override base container key val"))
 			}
 		}
-
-		if err := unstructured.SetNestedField(containers[0].(map[string]interface{}), defaultProbe(eveDeployment.GetReadiness(), containers[0].(map[string]interface{}))["readinessProbe"], "readinessProbe"); err != nil {
-			defContainerErrs = multierror.Append(defContainerErrs, errors.Wrap(err, "failed to override container readinessProbe"))
-		}
-
-		if err := unstructured.SetNestedField(containers[0].(map[string]interface{}), defaultProbe(eveDeployment.GetLiveness(), containers[0].(map[string]interface{}))["livenessProbe"], "livenessProbe"); err != nil {
-			defContainerErrs = multierror.Append(defContainerErrs, errors.Wrap(err, "failed to override container readinessProbe"))
-		}
-
 	}
 
-	if err := unstructured.SetNestedSlice(definition.Object, containers, definitionSpecKeyMap["containers"]...); err != nil {
+	if err := unstructured.SetNestedSlice(definition.Object, containers, "spec", "template", "spec", "containers"); err != nil {
 		defContainerErrs = multierror.Append(defContainerErrs, errors.Wrap(err, "failed to override container values..."))
 	}
 
