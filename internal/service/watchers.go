@@ -51,12 +51,12 @@ func (s *Scheduler) getWatcher(ctx context.Context, eveDeployment eve.Deployment
 func (s *Scheduler) watchPods(
 	ctx context.Context,
 	eveDeployment eve.DeploymentSpec,
-	plan *eve.NSDeploymentPlan,
+	namespace string,
 ) error {
 
-	w, err := s.getWatcher(ctx, eveDeployment, plan.Namespace.Name)
+	w, err := s.getWatcher(ctx, eveDeployment, namespace)
 	if err != nil {
-		return errors.Wrap(err, "an error occurred trying to apply the post crd")
+		return errors.Wrap(err, "error trying to get watcher")
 	}
 
 	switch eveDeployment.(type) {

@@ -84,7 +84,7 @@ func (s *Scheduler) deploy(ctx context.Context, deployment eve.DeploymentSpec, p
 	}
 
 	// We wait/watch for 1 successful pod to come up
-	if err := s.watchPods(ctx, deployment, plan); err != nil {
+	if err := s.watchPods(ctx, deployment, plan.Namespace.Name); err != nil {
 		failNLog(err, "an error occurred while watching k8s deployment pods")
 		return
 	}

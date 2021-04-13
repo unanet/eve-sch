@@ -7,6 +7,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	"k8s.io/client-go/kubernetes"
+
 	"gitlab.unanet.io/devops/eve-sch/internal/vault"
 	"gitlab.unanet.io/devops/eve/pkg/eve"
 	"gitlab.unanet.io/devops/eve/pkg/queue"
@@ -14,7 +16,6 @@ import (
 	"gitlab.unanet.io/devops/go/pkg/log"
 	"go.uber.org/zap"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
 )
 
 const (

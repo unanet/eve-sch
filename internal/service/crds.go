@@ -7,20 +7,15 @@ import (
 	"strings"
 	"time"
 
-	"go.uber.org/zap"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-
-	"k8s.io/client-go/util/retry"
-
-	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"gitlab.unanet.io/devops/eve-sch/internal/config"
-	apiv1 "k8s.io/api/core/v1"
-
 	"gitlab.unanet.io/devops/eve/pkg/eve"
 	"gitlab.unanet.io/devops/go/pkg/errors"
+	"go.uber.org/zap"
+	apiv1 "k8s.io/api/core/v1"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/util/retry"
 )
 
 func groupSchemaResourceVersion(crdDef eve.DefinitionResult) schema.GroupVersionResource {
@@ -42,9 +37,21 @@ func (s *Scheduler) deployServiceCRD(ctx context.Context, deployment eve.Deploym
 		}
 
 		if strings.ToLower(crd.Kind) == "service" {
-			if err := s.setServiceDefinitions(definition, deployment); err != nil {
-				return errors.Wrap(err, "an error occurred trying to setup the k8s main service crd")
+			if deployment.GetServicePort() > 0 {
+				svcPorts, found, err := unstructured.NestedSlice(definition.Object, "spec", "ports")
+				if err != nil || !found || svcPorts == nil || len(svcPorts) == 0 {
+					portEntry := map[string]interface{}{"port": int64(deployment.GetServicePort())}
+					if err := unstructured.SetNestedSlice(definition.Object, []interface{}{portEntry}, "spec", "ports"); err != nil {
+						return errors.Wrap(err, "failed to set spec.selector.matchLabels.app on k8s CRD")
+					}
+					s.Logger(ctx).Warn("set default service port", zap.String("name", deployment.GetName()))
+				}
 			}
+
+			if err := unstructured.SetNestedField(definition.Object, deployment.GetName(), "spec", "selector", "app"); err != nil {
+				return errors.Wrap(err, "failed to set selectorApp on k8s CRD")
+			}
+
 			if err := s.saveServiceCRD(ctx, plan, deployment, definition, crd); err != nil {
 				return errors.Wrap(err, "an error occurred trying to save the k8s main service crd")
 			}
@@ -53,7 +60,7 @@ func (s *Scheduler) deployServiceCRD(ctx context.Context, deployment eve.Deploym
 		}
 
 		if strings.ToLower(crd.Kind) == "deployment" {
-			err := s.setDeploymentDefinitions(definition, plan, deployment)
+			err := s.setDeploymentDefinitions(ctx, definition, plan, deployment)
 			if err != nil {
 				return errors.Wrap(err, "an error occurred trying to setup the k8s main deployment crd")
 			}
@@ -79,38 +86,17 @@ func (s *Scheduler) deployServiceCRD(ctx context.Context, deployment eve.Deploym
 }
 
 func (s *Scheduler) setDeploymentDefinitions(
+	ctx context.Context,
 	definition *unstructured.Unstructured,
 	plan *eve.NSDeploymentPlan,
 	eveDeployment eve.DeploymentSpec,
 ) error {
 
-	if err := unstructured.SetNestedField(definition.Object, eveDeployment.GetName(), definitionSpecKeyMap["matchLabelsApp"]...); err != nil {
+	if err := unstructured.SetNestedField(definition.Object, eveDeployment.GetName(), "spec", "selector", "matchLabels", "app"); err != nil {
 		return errors.Wrap(err, "failed to set selectorApp on k8s CRD")
 	}
 
-	if err := defaultReplicas(definition, eveDeployment); err != nil {
-		return errors.Wrap(err, "failed to override replicas")
-	}
-
-	if err := defaultTerminationGracePeriod(definition); err != nil {
-		return errors.Wrap(err, "failed to override terminationGracePeriod")
-	}
-
-	if config.GetConfig().EnableNodeGroup {
-		if err := defaultNodeSelector(definition); err != nil {
-			return errors.Wrap(err, "failed to override node selector")
-		}
-	}
-
-	if err := defaultSecurityContext(definition, eveDeployment); err != nil {
-		return errors.Wrap(err, "failed to override security context")
-	}
-
-	if err := defaultServiceAccountName(definition, eveDeployment); err != nil {
-		return errors.Wrap(err, "failed to override service account name")
-	}
-
-	if err := overrideImagePullSecrets(definition); err != nil {
+	if err := s.overrideImagePullSecrets(ctx, definition); err != nil {
 		return errors.Wrap(err, "failed to override image pull secrets")
 	}
 
@@ -121,48 +107,18 @@ func (s *Scheduler) setDeploymentDefinitions(
 	return nil
 }
 
-func (s *Scheduler) setServiceDefinitions(definition *unstructured.Unstructured, eveDeployment eve.DeploymentSpec) error {
-
-	if err := defaultServicePort(definition, eveDeployment); err != nil {
-		return errors.Wrap(err, "failed to set default service port")
-	}
-
-	if err := unstructured.SetNestedField(definition.Object, eveDeployment.GetName(), definitionSpecKeyMap["selectorApp"]...); err != nil {
-		return errors.Wrap(err, "failed to set selectorApp on k8s CRD")
-	}
-
-	if err := defaultStickySessions(definition, eveDeployment); err != nil {
-		return errors.Wrap(err, "failed to set the default sticky sessions")
-	}
-
-	return nil
-}
-
 func (s *Scheduler) setJobDefinitions(
+	ctx context.Context,
 	definition *unstructured.Unstructured,
 	plan *eve.NSDeploymentPlan,
 	eveDeployment eve.DeploymentSpec,
 ) error {
 
-	if err := unstructured.SetNestedField(definition.Object, string(apiv1.RestartPolicyNever), definitionSpecKeyMap["restartPolicy"]...); err != nil {
+	if err := unstructured.SetNestedField(definition.Object, string(apiv1.RestartPolicyNever), "spec", "template", "spec", "restartPolicy"); err != nil {
 		return errors.Wrap(err, "failed to override restartPolicy")
 	}
 
-	if config.GetConfig().EnableNodeGroup {
-		if err := defaultNodeSelector(definition); err != nil {
-			return errors.Wrap(err, "failed to override node selector")
-		}
-	}
-
-	if err := defaultSecurityContext(definition, eveDeployment); err != nil {
-		return errors.Wrap(err, "failed to override security context")
-	}
-
-	if err := defaultServiceAccountName(definition, eveDeployment); err != nil {
-		return errors.Wrap(err, "failed to override service account name")
-	}
-
-	if err := overrideImagePullSecrets(definition); err != nil {
+	if err := s.overrideImagePullSecrets(ctx, definition); err != nil {
 		return errors.Wrap(err, "failed to override image pull secrets")
 	}
 
@@ -187,7 +143,7 @@ func (s *Scheduler) deployJobCRD(ctx context.Context, deployment eve.DeploymentS
 			return errors.Wrap(err, "failed to apply base definition main CRD")
 		}
 		if crd.Kind == "Job" {
-			if err := s.setJobDefinitions(definition, plan, deployment); err != nil {
+			if err := s.setJobDefinitions(ctx, definition, plan, deployment); err != nil {
 				return errors.Wrap(err, "failed to set job definition main CRD")
 			}
 		}
@@ -302,12 +258,10 @@ func (s *Scheduler) resolveExistingCRD(
 	eveDeployment eve.DeploymentSpec,
 ) (*unstructured.Unstructured, bool, error) {
 
-	groupSchemaVersion := groupSchemaResourceVersion(crd)
-
-	existingCRD, err := s.k8sDynamicClient.Resource(groupSchemaVersion).Namespace(plan.Namespace.Name).Get(ctx, eveDeployment.GetName(), metav1.GetOptions{})
+	existingCRD, err := s.k8sDynamicClient.Resource(groupSchemaResourceVersion(crd)).Namespace(plan.Namespace.Name).Get(ctx, eveDeployment.GetName(), metav1.GetOptions{})
 	if err != nil {
 		if k8sErrors.IsNotFound(err) {
-			newCRD, createErr := s.createCRD(ctx, groupSchemaVersion, plan.Namespace.Name, definition)
+			newCRD, createErr := s.createCRD(ctx, groupSchemaResourceVersion(crd), plan.Namespace.Name, definition)
 			if createErr != nil {
 				return nil, false, errors.Wrap(createErr, "an error occurred trying to create the new k8s Service CRD")
 			}
@@ -323,9 +277,9 @@ func (s *Scheduler) saveDeploymentCRD(
 	plan *eve.NSDeploymentPlan,
 	eveDeployment eve.DeploymentSpec,
 	definition *unstructured.Unstructured,
-	crdDef eve.DefinitionResult) error {
+	eveCRD eve.DefinitionResult) error {
 
-	crd, newlyCreated, err := s.resolveExistingCRD(ctx, definition, crdDef, plan, eveDeployment)
+	crd, newlyCreated, err := s.resolveExistingCRD(ctx, definition, eveCRD, plan, eveDeployment)
 	if err != nil {
 		return errors.Wrap(err, "failed to resolve the existing CRD")
 	}
@@ -335,12 +289,12 @@ func (s *Scheduler) saveDeploymentCRD(
 	}
 
 	if plan.Type == eve.DeploymentPlanTypeRestart {
-		if err := unstructured.SetNestedField(crd.Object, eveDeployment.GetNuance(), definitionSpecKeyMap["labelsNuance"]...); err != nil {
+		if err := unstructured.SetNestedField(crd.Object, eveDeployment.GetNuance(), "spec", "template", "metadata", "labels", "nuance"); err != nil {
 			return errors.Wrap(err, "failed to set nuance for k8s restart CRD")
 		}
 	}
 
-	return s.updateCRD(ctx, groupSchemaResourceVersion(crdDef), plan, definition)
+	return s.updateCRD(ctx, eveCRD, plan, definition)
 }
 
 func (s *Scheduler) saveServiceCRD(
@@ -372,7 +326,7 @@ func (s *Scheduler) saveServiceCRD(
 			return errors.Wrap(err, "failed to set clusterIP on k8s service CRD")
 		}
 
-		return s.updateCRD(ctx, groupSchemaResourceVersion(crdDef), plan, definition)
+		return s.updateCRD(ctx, crdDef, plan, definition)
 
 	}
 	s.Logger(ctx).Warn("service CRD saved without Service Port")
@@ -404,11 +358,11 @@ func (s *Scheduler) saveJobCRD(
 		return errors.Wrap(err, "failed to delete k8s CRD")
 	}
 
-	s.Logger(ctx).Info("info job deleted...sleeping...", zap.String("name", eveDeployment.GetName()))
+	s.Logger(ctx).Info("job deleted...sleeping...", zap.String("name", eveDeployment.GetName()))
 
 	time.Sleep(5 * time.Second)
 
-	s.Logger(ctx).Info("info creating new", zap.String("name", eveDeployment.GetName()))
+	s.Logger(ctx).Info("creating new job", zap.String("name", eveDeployment.GetName()))
 
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		if _, err := s.k8sDynamicClient.Resource(groupSchemaResourceVersion(crdDef)).Namespace(plan.Namespace.Name).Create(ctx, definition, metav1.CreateOptions{}); err != nil {
@@ -424,19 +378,19 @@ func (s *Scheduler) saveJobCRD(
 		return errors.Wrap(retryErr, "failed to create k8s CRD after retry")
 	}
 
-	s.Logger(ctx).Info("job successfully deleted and recreated", zap.String("name", eveDeployment.GetName()))
+	s.Logger(ctx).Info("job successfully deleted and created", zap.String("name", eveDeployment.GetName()))
 	return nil
 }
 
 func (s *Scheduler) saveGenericCRD(
 	ctx context.Context,
 	definition *unstructured.Unstructured,
-	crd eve.DefinitionResult,
+	eveCRD eve.DefinitionResult,
 	plan *eve.NSDeploymentPlan,
 	eveDeployment eve.DeploymentSpec,
 ) error {
 
-	_, newlyCreated, err := s.resolveExistingCRD(ctx, definition, crd, plan, eveDeployment)
+	_, newlyCreated, err := s.resolveExistingCRD(ctx, definition, eveCRD, plan, eveDeployment)
 	if err != nil {
 		return errors.Wrap(err, "failed to resolve the existing CRD")
 	}
@@ -446,27 +400,29 @@ func (s *Scheduler) saveGenericCRD(
 	}
 
 	// CRD Already exists, so let's update it with the new definition
-	return s.updateCRD(ctx, groupSchemaResourceVersion(crd), plan, definition)
+	return s.updateCRD(ctx, eveCRD, plan, definition)
 
 }
 
 /*
 	CRUD Ops for CRDs
 */
-func (s *Scheduler) updateCRD(ctx context.Context, crdResult schema.GroupVersionResource, plan *eve.NSDeploymentPlan, definition *unstructured.Unstructured) error {
+func (s *Scheduler) updateCRD(ctx context.Context, crdDef eve.DefinitionResult, plan *eve.NSDeploymentPlan, definition *unstructured.Unstructured) error {
 
-	crdResult.Version = strings.TrimPrefix(crdResult.Version, "/")
+	gsrv := groupSchemaResourceVersion(crdDef)
+
+	gsrv.Version = strings.TrimPrefix(gsrv.Version, "/")
 
 	s.Logger(ctx).Debug("updating CRD",
-		zap.Any("crd.Version", crdResult.Version),
-		zap.Any("crd.Resource", crdResult.Resource),
-		zap.Any("crd.Group", crdResult.Group),
-		zap.Any("crd.GroupResource", crdResult.GroupResource()),
-		zap.Any("crd.GroupVersion", crdResult.GroupVersion()),
+		zap.Any("Version", gsrv.Version),
+		zap.Any("Resource", gsrv.Resource),
+		zap.Any("Group", gsrv.Group),
+		zap.Any("GroupResource", gsrv.GroupResource()),
+		zap.Any("GroupVersion", gsrv.GroupVersion()),
 	)
 
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		_, updateErr := s.k8sDynamicClient.Resource(crdResult).Namespace(plan.Namespace.Name).Update(ctx, definition, metav1.UpdateOptions{})
+		_, updateErr := s.k8sDynamicClient.Resource(gsrv).Namespace(plan.Namespace.Name).Update(ctx, definition, metav1.UpdateOptions{})
 		return updateErr
 	})
 	if retryErr != nil {
@@ -475,18 +431,18 @@ func (s *Scheduler) updateCRD(ctx context.Context, crdResult schema.GroupVersion
 	return nil
 }
 
-func (s *Scheduler) createCRD(ctx context.Context, crdResult schema.GroupVersionResource, nameSpace string, definition *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+func (s *Scheduler) createCRD(ctx context.Context, groupSchemaVersion schema.GroupVersionResource, nameSpace string, definition *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 
 	s.Logger(ctx).Debug("creating new k8s crds with definition",
 		zap.String("namespace", nameSpace),
 		zap.Any("definition", definition),
-		zap.Any("crd", crdResult),
+		zap.Any("groupSchemaVersion", groupSchemaVersion),
 	)
 
 	var newCRD *unstructured.Unstructured
 	var err, retryErr error
 	retryErr = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		if newCRD, err = s.k8sDynamicClient.Resource(crdResult).Namespace(nameSpace).Create(ctx, definition, metav1.CreateOptions{}); err != nil {
+		if newCRD, err = s.k8sDynamicClient.Resource(groupSchemaVersion).Namespace(nameSpace).Create(ctx, definition, metav1.CreateOptions{}); err != nil {
 			s.Logger(ctx).Error("failed creating new k8s crds", zap.Error(err))
 			return err
 		}
@@ -499,7 +455,7 @@ func (s *Scheduler) createCRD(ctx context.Context, crdResult schema.GroupVersion
 }
 
 func (s *Scheduler) deleteCRD(ctx context.Context, nameSpace string, existingCRD *unstructured.Unstructured, crdDef eve.DefinitionResult) error {
-	s.Logger(ctx).Info("deleting  k8s crds with definition",
+	s.Logger(ctx).Info("deleting k8s crds with definition",
 		zap.String("namespace", nameSpace),
 		zap.Any("existing_crd", existingCRD),
 		zap.Any("crd", crdDef),
