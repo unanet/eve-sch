@@ -16,6 +16,7 @@ spec:
         prometheus.io/port: "3001"
       labels:
         app: eve-sch-v1
+        metrics: enabled
     spec:
       serviceAccountName: {{ .Values.serviceAccount }}
       securityContext:
