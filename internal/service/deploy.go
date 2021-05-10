@@ -13,7 +13,7 @@ import (
 // Public CONST
 const (
 	DockerRepoFormat = "unanet-%s.jfrog.io"
-	TimeoutExitCode  = -999999
+	TimeoutExitCode  = 124
 )
 
 func intContains(s []int, e int) bool {
