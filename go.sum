@@ -173,6 +173,7 @@ github.com/go-chi/chi v4.1.2+incompatible h1:fGFk2Gmi/YKXk0OmGfBh0WgmN3XB8lVnEyN
 github.com/go-chi/chi v4.1.2+incompatible/go.mod h1:eB3wogJHnLi3x/kFX2A+IbTBlXxmMeXJVKy9tTv1XzQ=
 github.com/go-chi/cors v1.1.1 h1:eHuqxsIw89iXcWnWUN8R72JMibABJTN/4IOYI5WERvw=
 github.com/go-chi/cors v1.1.1/go.mod h1:K2Yje0VW/SJzxiyMYu6iPQYa7hMjQX2i/F491VChg1I=
+github.com/go-chi/jwtauth v4.0.4+incompatible/go.mod h1:Q5EIArY/QnD6BdS+IyDw7B2m6iNbnPxtfd6/BcmtWbs=
 github.com/go-chi/render v1.0.1 h1:4/5tis2cKaNdnv9zFLfXzcquC9HbeZgCnxGnKrltBS8=
 github.com/go-chi/render v1.0.1/go.mod h1:pq4Rr7HbnsdaeHagklXub+p6Wd16Af5l9koip1OvJns=
 github.com/go-gl/glfw v0.0.0-20190409004039-e6da0acd62b1/go.mod h1:vR7hzQXu2zJy9AVAgeJqvqgH9Q5CA+iKCZ2gyEVpxRU=
@@ -592,6 +593,8 @@ gitlab.unanet.io/devops/eve v0.17.3 h1:fwJl1v/6IceQkjWRfgXeR4MI/Qsg6IBfNc1Osbg6x
 gitlab.unanet.io/devops/eve v0.17.3/go.mod h1:EUeH82uUzT0UcQCS/6N6NSMjdKW++8D3dHZFf0YOu9c=
 gitlab.unanet.io/devops/go v1.4.0 h1:30YudvBSF1UCR75VJGT7Y6DIj+UsLPW9M6N4Q4wJkE8=
 gitlab.unanet.io/devops/go v1.4.0/go.mod h1:ztV73hE0+l+AjoUfAbCm8w6e3YbG3Hj1r+X08nS/+DA=
+gitlab.unanet.io/devops/go v1.6.0 h1:xHGERBuYUr21wg8gqq6QlJH3jxtFpwtFmoXz0kRU+tY=
+gitlab.unanet.io/devops/go v1.6.0/go.mod h1:XyI1eV9BpGVxDP3AH9zxumecz4KxCkkLfUpy17oydVk=
 go.etcd.io/bbolt v1.3.3/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738/go.mod h1:dnLIgRNXwCJa5e+c6mIZCrds/GIG4ncV9HhK5PX7jPg=
 go.mongodb.org/mongo-driver v1.1.0/go.mod h1:u7ryQJ+DOzQmeO7zB6MHyr8jkEQvC8vH7qLUO4lqsUM=

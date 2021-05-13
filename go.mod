@@ -16,7 +16,7 @@ require (
 	github.com/satori/go.uuid v1.2.0
 	github.com/stretchr/testify v1.6.1
 	gitlab.unanet.io/devops/eve v0.17.3
-	gitlab.unanet.io/devops/go v1.4.0
+	gitlab.unanet.io/devops/go v1.6.0
 	go.uber.org/zap v1.16.0
 	k8s.io/api v0.20.4
 	k8s.io/apimachinery v0.20.4
