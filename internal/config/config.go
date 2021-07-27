@@ -14,11 +14,6 @@ var (
 	mutex  = sync.Mutex{}
 )
 
-// EVE_API_Q_URL
-// EVE_NAMESPACE
-// EVE_SCH_URL
-// EVE_S3_BUCKET
-// EVE_AWS_REGION
 type Config struct {
 	ApiQUrl                string        `split_words:"true" required:"true"`
 	Namespace              string        `split_words:"true" required:"true"`
@@ -27,14 +22,12 @@ type Config struct {
 	SchQVisibilityTimeout  int64         `split_words:"true" default:"3600"`
 	SchQMaxNumberOfMessage int64         `split_words:"true" default:"5"`
 	SchQWorkerTimeout      time.Duration `split_words:"true" default:"7200s"`
-	FnTriggerTimeout       time.Duration `split_words:"true" default:"300s"`
 	K8sDeployTimeoutSec    int64         `split_words:"true" default:"300"`
 	K8sJobTimeoutSec       int64         `split_words:"true" default:"3600"`
 	S3Bucket               string        `split_words:"true" required:"true"`
 	AWSRegion              string        `split_words:"true" required:"true"`
 	MetricsPort            int           `split_words:"true" default:"3001"`
 	Port                   int           `split_words:"true" default:"8080"`
-	EnableNodeGroup        bool          `split_words:"true" default:"false"`
 }
 
 func GetConfig() Config {
