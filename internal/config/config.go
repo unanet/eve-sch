@@ -7,8 +7,6 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"gitlab.unanet.io/devops/go/pkg/log"
 	"go.uber.org/zap"
-
-	"gitlab.unanet.io/devops/eve-sch/internal/vault"
 )
 
 var (
@@ -16,15 +14,12 @@ var (
 	mutex  = sync.Mutex{}
 )
 
-type VaultConfig = vault.Config
-
 // EVE_API_Q_URL
 // EVE_NAMESPACE
 // EVE_SCH_URL
 // EVE_S3_BUCKET
 // EVE_AWS_REGION
 type Config struct {
-	VaultConfig
 	ApiQUrl                string        `split_words:"true" required:"true"`
 	Namespace              string        `split_words:"true" required:"true"`
 	SchQUrl                string        `split_words:"true" required:"true"`

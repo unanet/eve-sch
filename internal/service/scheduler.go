@@ -9,7 +9,6 @@ import (
 
 	"k8s.io/client-go/kubernetes"
 
-	"gitlab.unanet.io/devops/eve-sch/internal/vault"
 	"gitlab.unanet.io/devops/eve/pkg/eve"
 	"gitlab.unanet.io/devops/eve/pkg/queue"
 	"gitlab.unanet.io/devops/go/pkg/errors"
@@ -31,11 +30,6 @@ type QueueWorker interface {
 	Message(ctx context.Context, qUrl string, m *queue.M) error
 }
 
-type SecretsClient interface {
-	GetKVSecretString(ctx context.Context, path string, key string) (string, error)
-	GetKVSecrets(ctx context.Context, path string) (vault.Secrets, error)
-}
-
 type Scheduler struct {
 	worker           QueueWorker
 	downloader       eve.CloudDownloader
@@ -43,7 +37,6 @@ type Scheduler struct {
 	sigChannel       chan os.Signal
 	done             chan bool
 	apiQUrl          string
-	vault            SecretsClient
 	k8sDynamicClient dynamic.Interface
 	k8sClient        *kubernetes.Clientset
 }
@@ -53,7 +46,6 @@ func NewScheduler(
 	downloader eve.CloudDownloader,
 	uploader eve.CloudUploader,
 	apiQUrl string,
-	vault SecretsClient,
 	k8sDynamic dynamic.Interface,
 	k8sClient *kubernetes.Clientset,
 ) *Scheduler {
@@ -64,7 +56,6 @@ func NewScheduler(
 		done:             make(chan bool),
 		sigChannel:       make(chan os.Signal, 1024),
 		apiQUrl:          apiQUrl,
-		vault:            vault,
 		k8sDynamicClient: k8sDynamic,
 		k8sClient:        k8sClient,
 	}

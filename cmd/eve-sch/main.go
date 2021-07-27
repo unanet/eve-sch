@@ -7,7 +7,6 @@ import (
 	"gitlab.unanet.io/devops/eve-sch/internal/config"
 	"gitlab.unanet.io/devops/eve-sch/internal/service"
 	"gitlab.unanet.io/devops/eve-sch/internal/service/callback"
-	"gitlab.unanet.io/devops/eve-sch/internal/vault"
 	"gitlab.unanet.io/devops/eve/pkg/queue"
 	"gitlab.unanet.io/devops/eve/pkg/s3"
 	"gitlab.unanet.io/devops/go/pkg/errors"
@@ -23,11 +22,6 @@ func main() {
 	awsSession, err := session.NewSession(&aws.Config{Region: aws.String(c.AWSRegion)})
 	if err != nil {
 		log.Logger.Panic("failed to create aws session", zap.Error(err))
-	}
-
-	vaultClient, err := vault.NewClient()
-	if err != nil {
-		log.Logger.Panic("failed to create the vault secrets client")
 	}
 
 	k8sDynamicClient, err := getDynamicK8sClient()
@@ -54,7 +48,7 @@ func main() {
 
 	s3Downloader := s3.NewDownloader(awsSession)
 	worker := queue.NewWorker("eve-sch", schQueue, c.SchQWorkerTimeout)
-	scheduler := service.NewScheduler(worker, s3Downloader, s3Uploader, c.ApiQUrl, vaultClient, k8sDynamicClient, k8sClient)
+	scheduler := service.NewScheduler(worker, s3Downloader, s3Uploader, c.ApiQUrl, k8sDynamicClient, k8sClient)
 	scheduler.Start()
 	callbackManager := callback.NewManager(worker, c.ApiQUrl)
 
