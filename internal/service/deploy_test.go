@@ -12,10 +12,10 @@ import (
 
 	uuid "github.com/satori/go.uuid"
 	"github.com/stretchr/testify/require"
-	"gitlab.unanet.io/devops/eve-sch/internal/vault"
-	"gitlab.unanet.io/devops/eve/pkg/eve"
-	"gitlab.unanet.io/devops/eve/pkg/queue"
-	"gitlab.unanet.io/devops/eve/pkg/s3"
+	// "github.com/unanet/eve-sch/internal/vault"
+	"github.com/unanet/eve/pkg/eve"
+	"github.com/unanet/eve/pkg/queue"
+	"github.com/unanet/eve/pkg/s3"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -193,11 +193,11 @@ func (msc *MockSecretClient) GetKVSecretString(ctx context.Context, path string,
 	return "supersecretstuffhere", nil
 }
 
-func (msc *MockSecretClient) GetKVSecrets(ctx context.Context, path string) (vault.Secrets, error) {
-	result := make(map[string]string)
-	result["fakekey"] = "fakevalue"
-	return result, nil
-}
+// func (msc *MockSecretClient) GetKVSecrets(ctx context.Context, path string) (vault.Secrets, error) {
+// 	result := make(map[string]string)
+// 	result["fakekey"] = "fakevalue"
+// 	return result, nil
+// }
 
 func newMockSecretsClient() *MockSecretClient {
 	return &MockSecretClient{}

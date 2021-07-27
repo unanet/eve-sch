@@ -1,6 +1,6 @@
 # eve-sch
 
-![pipeline status](https://gitlab.unanet.io/devops/eve-sch/badges/master/pipeline.svg)
+![pipeline status](https://github.com/unanet/eve-sch/badges/master/pipeline.svg)
 
 Eve-sch is a component of the Eve CI/CD ChatOps Pipeline. 
 It is the component that "knows" about Kubernetes, and interfaces with the K8s Clusters. 

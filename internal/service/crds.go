@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"gitlab.unanet.io/devops/eve/pkg/eve"
-	"gitlab.unanet.io/devops/go/pkg/errors"
+	"github.com/unanet/eve/pkg/eve"
+	"github.com/unanet/go/pkg/errors"
 	"go.uber.org/zap"
 	apiv1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"

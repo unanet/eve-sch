@@ -6,11 +6,11 @@ import (
 
 	"github.com/pkg/errors"
 
-	"gitlab.unanet.io/devops/eve-sch/internal/config"
+	"github.com/unanet/eve-sch/internal/config"
 
 	"k8s.io/apimachinery/pkg/watch"
 
-	"gitlab.unanet.io/devops/eve/pkg/eve"
+	"github.com/unanet/eve/pkg/eve"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

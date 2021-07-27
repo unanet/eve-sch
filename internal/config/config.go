@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
-	"gitlab.unanet.io/devops/go/pkg/log"
+	"github.com/unanet/go/pkg/log"
 	"go.uber.org/zap"
 )
 

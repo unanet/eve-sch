@@ -3,7 +3,7 @@ package api
 import (
 	"github.com/go-chi/chi"
 
-	"gitlab.unanet.io/devops/eve-sch/internal/service/callback"
+	"github.com/unanet/eve-sch/internal/service/callback"
 )
 
 type Controller interface {

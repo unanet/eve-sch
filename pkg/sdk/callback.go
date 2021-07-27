@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
-	"gitlab.unanet.io/devops/go/pkg/errors"
-	chttp "gitlab.unanet.io/devops/go/pkg/http"
+	"github.com/unanet/go/pkg/errors"
+	chttp "github.com/unanet/go/pkg/http"
 	"go.uber.org/zap"
 )
 

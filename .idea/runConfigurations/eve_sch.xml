@@ -14,7 +14,7 @@
     </envs>
     <kind value="FILE" />
     <filePath value="$PROJECT_DIR$/cmd/eve-sch/main.go" />
-    <package value="gitlab.unanet.io/devops/eve-sch" />
+    <package value="github.com/unanet/eve-sch" />
     <directory value="$PROJECT_DIR$/" />
     <method v="2" />
   </configuration>

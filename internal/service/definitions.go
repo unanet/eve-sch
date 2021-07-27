@@ -7,7 +7,7 @@ import (
 	"reflect"
 
 	"github.com/pkg/errors"
-	"gitlab.unanet.io/devops/eve/pkg/eve"
+	"github.com/unanet/eve/pkg/eve"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )

@@ -7,7 +7,7 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/go-chi/render"
 
-	"gitlab.unanet.io/devops/go/pkg/errors"
+	"github.com/unanet/go/pkg/errors"
 )
 
 type PingController struct {

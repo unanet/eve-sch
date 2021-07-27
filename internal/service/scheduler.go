@@ -9,10 +9,10 @@ import (
 
 	"k8s.io/client-go/kubernetes"
 
-	"gitlab.unanet.io/devops/eve/pkg/eve"
-	"gitlab.unanet.io/devops/eve/pkg/queue"
-	"gitlab.unanet.io/devops/go/pkg/errors"
-	"gitlab.unanet.io/devops/go/pkg/log"
+	"github.com/unanet/eve/pkg/eve"
+	"github.com/unanet/eve/pkg/queue"
+	"github.com/unanet/go/pkg/errors"
+	"github.com/unanet/go/pkg/log"
 	"go.uber.org/zap"
 	"k8s.io/client-go/dynamic"
 )

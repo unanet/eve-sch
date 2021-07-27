@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 
 	uuid "github.com/satori/go.uuid"
-	"gitlab.unanet.io/devops/eve/pkg/eve"
-	"gitlab.unanet.io/devops/eve/pkg/queue"
-	"gitlab.unanet.io/devops/go/pkg/errors"
+	"github.com/unanet/eve/pkg/eve"
+	"github.com/unanet/eve/pkg/queue"
+	"github.com/unanet/go/pkg/errors"
 
-	"gitlab.unanet.io/devops/eve-sch/internal/service"
+	"github.com/unanet/eve-sch/internal/service"
 )
 
 func NewManager(w *queue.Worker, apiQUrl string) *Manager {

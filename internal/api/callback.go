@@ -6,11 +6,11 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/go-chi/render"
 	uuid "github.com/satori/go.uuid"
-	"gitlab.unanet.io/devops/eve/pkg/eve"
-	"gitlab.unanet.io/devops/go/pkg/errors"
-	"gitlab.unanet.io/devops/go/pkg/json"
+	"github.com/unanet/eve/pkg/eve"
+	"github.com/unanet/go/pkg/errors"
+	"github.com/unanet/go/pkg/json"
 
-	"gitlab.unanet.io/devops/eve-sch/internal/service/callback"
+	"github.com/unanet/eve-sch/internal/service/callback"
 )
 
 type CallbackController struct {
