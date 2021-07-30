@@ -3,7 +3,7 @@ module github.com/unanet/eve-sch
 go 1.16
 
 require (
-	github.com/aws/aws-sdk-go v1.40.9
+	github.com/aws/aws-sdk-go v1.40.11
 	github.com/go-chi/chi v4.1.0+incompatible
 	github.com/go-chi/render v1.0.1
 	github.com/hashicorp/go-multierror v1.1.1
