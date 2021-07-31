@@ -57,12 +57,7 @@ func main() {
 		log.Logger.Panic("Unable to Initialize the Controllers")
 	}
 
-	apiServer, err := api.NewApi(controllers, c)
-	if err != nil {
-		log.Logger.Panic("Failed to Create Api App", zap.Error(err))
-	}
-
-	apiServer.Start(scheduler.Stop)
+	api.NewApi(controllers, c).Start(scheduler.Stop)
 }
 
 func getDynamicK8sClient() (dynamic.Interface, error) {

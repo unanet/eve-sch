@@ -12,7 +12,7 @@ require (
 	github.com/satori/go.uuid v1.2.0
 	github.com/stretchr/testify v1.7.0
 	github.com/unanet/eve v0.0.0-20210727233527-18eb447b118d
-	github.com/unanet/go v0.0.0-20210727232642-d1689ad91e74
+	github.com/unanet/go v0.0.0-20210731164003-a222e7bdc32c
 	go.uber.org/zap v1.18.1
 	k8s.io/api v0.21.3
 	k8s.io/apimachinery v0.21.3
