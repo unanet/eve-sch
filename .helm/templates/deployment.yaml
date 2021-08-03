@@ -40,6 +40,12 @@ spec:
               value: {{ .Values.awsAccessKeyID }}
             - name: AWS_SECRET_ACCESS_KEY
               value: {{ .Values.awsSecretAccessKey }}
+            - name: AWS_ACCESS_KEY
+              value: {{ .Values.awsAccessKeyID }}
+            - name: AWS_SECRET_KEY
+              value: {{ .Values.awsSecretAccessKey }}
+            - name: AWS_REGION
+              value: {{ .Values.eveAWSRegion }}              
             - name: VAULT_ROLE
               value: {{ .Values.vaultRole }}
             - name: VAULT_ADDR

@@ -12,7 +12,7 @@ import (
 
 // Public CONST
 const (
-	DockerRepoFormat = "unanet-%s.jfrog.io"
+	DockerRepoFormat = "plainsight.jfrog.io/docker-%s"
 	TimeoutExitCode  = 124
 )
 
