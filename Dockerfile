@@ -66,5 +66,5 @@ WORKDIR /bin
 USER appuser
 
 # Set the entrypoint to the golang executable binary
-ENTRYPOINT ["/bin/eve-sch"]
+CMD ["/bin/eve-sch"]
 
