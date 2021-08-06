@@ -61,7 +61,7 @@ spec:
             - name: PROVIDER_TYPE
               value: {{ .Values.secretsProviderType }}
             - name: DYNAMIC_SECRETS_ENABLED
-              value: {{ .Values.dynamicSecretsEnabled }}              
+              value: {{ .Values.dynamicSecretsEnabled | quote }}              
           ports:
             - containerPort: 3001
               name: metrics
