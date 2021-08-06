@@ -58,6 +58,10 @@ spec:
               value: {{ .Values.initLogLevel }}
             - name: EVE_NAMESPACE
               value: {{ .Values.eveNS }}
+            - name: PROVIDER_TYPE
+              value: {{ .Values.secretsProviderType }}
+            - name: DYNAMIC_SECRETS_ENABLED
+              value: {{ .Values.dynamicSecretsEnabled }}              
           ports:
             - containerPort: 3001
               name: metrics
