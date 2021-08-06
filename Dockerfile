@@ -52,7 +52,7 @@ RUN \
 # STEP 2 build a smaller runtime image
 ######################################
 # FROM scratch
-FROM plainsight.jfrog.io/docker/alpine:3.1
+FROM plainsight.jfrog.io/docker/alpine:3.14
 
 # Import assets from the build stage image
 COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
