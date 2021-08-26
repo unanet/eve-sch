@@ -360,7 +360,7 @@ func (s *Scheduler) saveJobCRD(
 
 	s.Logger(ctx).Info("job deleted...sleeping...", zap.String("name", eveDeployment.GetName()))
 
-	time.Sleep(5 * time.Second)
+	time.Sleep(15 * time.Second)
 
 	s.Logger(ctx).Info("creating new job", zap.String("name", eveDeployment.GetName()))
 
