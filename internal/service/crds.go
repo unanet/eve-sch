@@ -358,6 +358,9 @@ func (s *Scheduler) saveJobCRD(
 		return errors.Wrap(err, "failed to delete k8s CRD")
 	}
 
+	// TODO: Yuck! Remove this sleep and watch the deleted job pod(s)
+	// we need to wait until the job is removed before we can create it again
+	// however, in k8s 1.21 there is the Job TTL (which I am kind of holding off for...:)
 	s.Logger(ctx).Info("job deleted...sleeping...", zap.String("name", eveDeployment.GetName()))
 
 	time.Sleep(15 * time.Second)
