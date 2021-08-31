@@ -30,6 +30,11 @@ jobs:
           BUILD_HOST=$(hostname)
           echo "BUILD_HOST=$BUILD_HOST" >> $GITHUB_ENV
 
+      - name: Check SemVer Tag 🖖
+        run: |
+          echo "${{ env.VERSION }}"
+          make check_version          
+
       - name: Test 🧠
         run: |
           go get ./...
@@ -50,11 +55,6 @@ jobs:
             ${{ runner.os }}-buildx-
             ${{ runner.os }}-build-
             ${{ runner.os }}-
-
-      - name: Check SemVer Tag 🖖
-        run: |
-          echo "${{ env.VERSION }}"
-          make check_version
 
       - name: JFrog Docker Login 🐸  
         uses: docker/login-action@v1
