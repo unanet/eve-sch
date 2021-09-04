@@ -30,16 +30,18 @@ jobs:
           BUILD_HOST=$(hostname)
           echo "BUILD_HOST=$BUILD_HOST" >> $GITHUB_ENV
 
+      - name: Fetch tags
+        run: git fetch --depth=1 origin +refs/tags/*:refs/tags/*          
+
+      - name: Check SemVer Tag 🖖
+        run: |
+          echo "${{ env.VERSION }}"
+          make check_version          
+
       - name: Test 🧠
         run: |
           go get ./...
           go test ./... -v -race
-
-      - name: Login to DockerHub
-        uses: docker/login-action@v1 
-        with:
-          username: ${{ secrets.DOCKERHUB_USER }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}          
 
       - name: Set up Docker Buildx 🐳
         id: buildx
@@ -56,11 +58,6 @@ jobs:
             ${{ runner.os }}-buildx-
             ${{ runner.os }}-build-
             ${{ runner.os }}-
-
-      - name: Check SemVer Tag 🖖
-        run: |
-          echo "${{ env.VERSION }}"
-          make check_version
 
       - name: JFrog Docker Login 🐸  
         uses: docker/login-action@v1
@@ -86,8 +83,6 @@ jobs:
             BUILD_DATE='${{ env.BUILD_TIME }}' 
             PRERELEASE=''            
           tags: |
-            tjsampson/eve-sch:latest
-            tjsampson/eve-sch:${{ env.VERSION }}
             plainsight.jfrog.io/docker-int/ops/eve-sch-v1:${{ env.VERSION }}
 
       - name: Add JFrog Props 🐸

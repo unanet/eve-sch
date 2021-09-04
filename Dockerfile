@@ -1,7 +1,7 @@
 ##########################################
 # STEP 1 build binary in Build Stage Image
 ##########################################
-FROM golang:alpine AS builder
+FROM plainsight.jfrog.io/docker/golang:1.16.7 AS builder
 
 # Build ARGS
 ARG VERSION=0.0.0
