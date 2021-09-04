@@ -35,7 +35,8 @@ func getDeploymentContainerPorts(eveDeployment eve.DeploymentSpec) []interface{}
 }
 
 func getDockerImageName(artifact *eve.DeployArtifact) string {
-	return fmt.Sprintf("%s/%s:%s", fmt.Sprintf(DockerRepoFormat, artifact.ArtifactoryFeed), artifact.ArtifactoryPath, artifact.EvalImageTag())
+	baseDockerRepo := fmt.Sprintf("%s/%s", config.GetConfig().BaseArtifactHost, artifact.ArtifactoryFeed)
+	return fmt.Sprintf("%s/%s:%s", baseDockerRepo, artifact.ArtifactoryPath, artifact.EvalImageTag())
 }
 
 func defaultContainerEnvVars(deploymentID uuid.UUID, artifact *eve.DeployArtifact) []interface{} {

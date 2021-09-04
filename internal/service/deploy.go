@@ -11,11 +11,7 @@ import (
 )
 
 // Public CONST
-const (
-	// TODO: this needs to be a config value (or derived from a configuration prop/value)
-	DockerRepoFormat = "plainsight.jfrog.io/%s"
-	TimeoutExitCode  = 124
-)
+const TimeoutExitCode = 124
 
 func intContains(s []int, e int) bool {
 	for _, a := range s {
