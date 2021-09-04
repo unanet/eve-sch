@@ -1,7 +1,7 @@
 ##########################################
 # STEP 1 build binary in Build Stage Image
 ##########################################
-FROM plainsight.jfrog.io/docker/golang:1.16.7 AS builder
+FROM golang:1.16.7 AS builder
 
 # Build ARGS
 ARG VERSION=0.0.0
@@ -51,8 +51,7 @@ RUN \
 ######################################
 # STEP 2 build a smaller runtime image
 ######################################
-# FROM scratch
-FROM plainsight.jfrog.io/docker/alpine:3.14
+FROM scratch
 
 # Import assets from the build stage image
 COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo

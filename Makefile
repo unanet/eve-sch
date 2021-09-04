@@ -16,7 +16,7 @@ CUR_DIR := $(shell pwd)
 BUILD_HOST := $(shell hostname)
 BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
 BUILD_DATE := $(shell /bin/date -u "+%Y%m%d%H%M%S")
-BUILD_IMAGE := golang:alpine
+BUILD_IMAGE := golang:1.16.7
 IMAGE_NAME := eve-sch
 PRERELEASE ?= 
 
@@ -39,11 +39,7 @@ build: check_version
 
 helm: check_version
 	$(docker-helm-exec) package --version ${PATCH_VERSION} --app-version ${VERSION} ./.helm
-	curl --fail -H "X-JFrog-Art-Api:${JFROG_API_KEY}" \
-		-T eve-sch-${PATCH_VERSION}.tgz "https://plainsight.jfrog.io/artifactory/helm-local/eve-sch/eve-sch-${PATCH_VERSION}.tgz"
 
 test:
 	docker pull ${BUILD_IMAGE}
 	go test -tags !local ./...
-
-
