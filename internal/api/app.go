@@ -15,12 +15,20 @@ import (
 	"github.com/unanet/go/pkg/log"
 	"github.com/unanet/go/pkg/metrics"
 	"github.com/unanet/go/pkg/middleware"
+	"github.com/unanet/go/pkg/version"
 
 	"github.com/unanet/eve-sch/internal/config"
 )
 
 var (
-	Version = "unset"
+	Branch     = version.Branch
+	SHA        = version.SHA
+	ShortSHA   = version.ShortSHA
+	Author     = version.Author
+	BuildHost  = version.BuildHost
+	Version    = version.Version
+	Date       = version.Date
+	Prerelease = version.Prerelease
 )
 
 type Api struct {
@@ -34,7 +42,7 @@ type Api struct {
 	onShutdown  []func()
 }
 
-func NewApi(controllers []Controller, c config.Config) (*Api, error) {
+func NewApi(controllers []Controller, c config.Config) *Api {
 	router := chi.NewMux()
 	return &Api{
 		r:           router,
@@ -49,7 +57,7 @@ func NewApi(controllers []Controller, c config.Config) (*Api, error) {
 		},
 		done:       make(chan bool),
 		sigChannel: make(chan os.Signal, 1024),
-	}, nil
+	}
 }
 
 // Handle SIGNALS

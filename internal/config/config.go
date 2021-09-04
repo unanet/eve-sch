@@ -18,6 +18,7 @@ type Config struct {
 	ApiQUrl                string        `split_words:"true" required:"true"`
 	Namespace              string        `split_words:"true" required:"true"`
 	SchQUrl                string        `split_words:"true" required:"true"`
+	BaseArtifactHost       string        `split_words:"true" required:"true"`
 	SchQWaitTimeSecond     int64         `split_words:"true" default:"20"`
 	SchQVisibilityTimeout  int64         `split_words:"true" default:"3600"`
 	SchQMaxNumberOfMessage int64         `split_words:"true" default:"5"`
