@@ -25,19 +25,13 @@ docker-helm-exec = docker run --rm --user ${DOCKER_UID}:${DOCKER_UID} \
 	-w /src \
 	alpine/helm	
 
-check-tag = !(git rev-parse -q --verify "refs/tags/v${PATCH_VERSION}" > /dev/null 2>&1) || \
-	(echo "the version: ${PATCH_VERSION} has been released already" && exit 1)
+.PHONY: test build 
 
-.PHONY: check_version test build 
-
-check_version:
-	@$(check-tag)
-
-build: check_version
+build:
 	docker pull ${BUILD_IMAGE}
 	docker build --build-arg VERSION=${VERSION} --build-arg SHA=${SHA} --build-arg SHORT_SHA=${SHORT_SHA} --build-arg AUTHOR='${AUTHOR}' --build-arg BUILD_HOST='${BUILD_HOST}' --build-arg BRANCH=${BRANCH} --build-arg BUILD_DATE='${BUILD_DATE}' --build-arg PRERELEASE='${PRERELEASE}' . -t ${IMAGE_NAME} -t ${IMAGE_NAME}:${PATCH_VERSION}
 
-helm: check_version
+helm:
 	$(docker-helm-exec) package --version ${PATCH_VERSION} --app-version ${VERSION} ./.helm
 
 test:
