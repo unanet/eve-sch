@@ -16,7 +16,7 @@ CUR_DIR := $(shell pwd)
 BUILD_HOST := $(shell hostname)
 BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
 BUILD_DATE := $(shell /bin/date -u "+%Y%m%d%H%M%S")
-BUILD_IMAGE := golang:1.16.7
+BUILD_IMAGE := golang:alpine
 IMAGE_NAME := eve-sch
 PRERELEASE ?= 
 
