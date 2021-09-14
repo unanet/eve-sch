@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
@@ -34,15 +35,16 @@ func getDeploymentContainerPorts(eveDeployment eve.DeploymentSpec) []interface{}
 	return result
 }
 
-// func getDockerImageName(artifact *eve.DeployArtifact) string {
-// 	baseDockerRepo := fmt.Sprintf("%s/%s", config.GetConfig().BaseArtifactHost, artifact.ArtifactoryFeed)
-// 	return fmt.Sprintf("%s/%s:%s", baseDockerRepo, artifact.ArtifactoryPath, artifact.EvalImageTag())
-// }
-
-const DockerRepoFormat = "unanet-%s.jfrog.io"
-
+// This needs to support a template syntax and a just a base host entry
+// some artifactory registries use a subdomain/host entry while others use path based
+// baseArtifactHost = "plainsight.jfrog.io" => plainsight.jfrog.io/docker-int/eve-api-v1:1.0.0
+// baseArtifactHost = "unanet-%s.jfrog.io" => unanet-docker-int.jfrog.io/eve-api-v1:1.0.0
 func getDockerImageName(artifact *eve.DeployArtifact) string {
-	return fmt.Sprintf("%s/%s:%s", fmt.Sprintf(DockerRepoFormat, artifact.ArtifactoryFeed), artifact.ArtifactoryPath, artifact.EvalImageTag())
+	baseArtifactHostCfg := config.GetConfig().BaseArtifactHost
+	if strings.Contains(baseArtifactHostCfg, "%") {
+		return fmt.Sprintf("%s/%s:%s", fmt.Sprintf(baseArtifactHostCfg, artifact.ArtifactoryFeed), artifact.ArtifactoryPath, artifact.EvalImageTag())
+	}
+	return fmt.Sprintf("%s/%s:%s", fmt.Sprintf("%s/%s", baseArtifactHostCfg, artifact.ArtifactoryFeed), artifact.ArtifactoryPath, artifact.EvalImageTag())
 }
 
 func defaultContainerEnvVars(deploymentID uuid.UUID, artifact *eve.DeployArtifact) []interface{} {
