@@ -11,7 +11,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/satori/go.uuid v1.2.0
 	github.com/stretchr/testify v1.7.0
-	github.com/unanet/eve v0.21.0
+	github.com/unanet/eve v0.21.2
 	github.com/unanet/go v1.7.14
 	go.uber.org/zap v1.18.1
 	k8s.io/api v0.21.3
